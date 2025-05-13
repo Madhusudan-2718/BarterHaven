@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { View, Text, StyleSheet, Dimensions, TouchableOpacity, Image, ScrollView, FlatList, ActivityIndicator, RefreshControl, Alert, TextInput } from 'react-native';
-import Swiper from 'react-native-swiper';
 import { useFonts } from 'expo-font';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '@/Config/supabaseConfig';
@@ -8,6 +7,7 @@ import { router, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { categories as allCategories } from '@/Config/categories';
 import { SearchContext } from './_layout';
+import BannerCarousel from '@/app/components/BannerCarousel';
 
 const { width } = Dimensions.get('window');
 
@@ -226,9 +226,9 @@ export default function Home({ navigation }) {
       numColumns={1}
       ListHeaderComponent={
         <>
-          {/* Swiper Banner */}
+          {/* Banner Carousel */}
           <View style={styles.bannerWrapper}>
-            <Swiper autoplay={true} autoplayTimeout={10} showsPagination={true} height={250}>
+            <BannerCarousel autoplay={true} autoplayInterval={5000}>
               <View style={styles.slide}>
                 <LinearGradient colors={['#2E3192', '#1BFFFF']} style={styles.gradient}>
                   <BarterBanner title="Welcome to BarterHaven" subtitle="Get free products and services via Barter" />
@@ -239,7 +239,7 @@ export default function Home({ navigation }) {
                   <BarterBanner title="Explore the Possibilities" subtitle="List your products and services to discover what others are willing to offer in return!" />
                 </LinearGradient>
               </View>
-            </Swiper>
+            </BannerCarousel>
           </View>
           {/* Categories Section */}
           <View style={styles.categoriesContainer}>

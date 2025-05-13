@@ -30,46 +30,9 @@ yarn-error.*
 *.pem
 
 # local env files
-.env
-.env.*
-.env.local
-.env.development
-.env.test
-.env.production
+.env*.local
 
 # typescript
 *.tsbuildinfo
-
-# Supabase
-supabase/.temp/
-supabase/config.toml
-supabase/service_role_key.txt
-supabase/anon_key.txt
-
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
-
-# Logs
-logs
-*.log
-
-# Build files
-build/
-dist/
-out/
-
-# Cache
-.cache/
-.npm/
-.eslintcache
-
-# Config files with sensitive data
-**/config.json
-**/credentials.json
-**/secrets.json
-**/keys.json
 
 app-example
