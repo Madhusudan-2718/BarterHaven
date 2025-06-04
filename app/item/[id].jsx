@@ -1,6 +1,6 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { View, Text, Image, StyleSheet, ActivityIndicator, ScrollView, Dimensions, TouchableOpacity, Modal, TextInput, Alert } from 'react-native';
+import { View, Text, Image, StyleSheet, ActivityIndicator, ScrollView, Dimensions, TouchableOpacity, Modal, TextInput, Alert, Linking } from 'react-native';
 import { supabase } from '@/Config/supabaseConfig';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
@@ -16,17 +16,37 @@ export default function ItemDetails() {
     const [proposedItemDescription, setProposedItemDescription] = useState('');
     const [message, setMessage] = useState('');
     const [submitting, setSubmitting] = useState(false);
+    const [billDocument, setBillDocument] = useState(null);
     const { user } = useAuth();
 
     useEffect(() => {
         const fetchItem = async () => {
-            const { data, error } = await supabase
-                .from('items')
-                .select('* , users(*)')
-                .eq('id', id)
-                .single();
-            setItem(data);
-            setLoading(false);
+            try {
+                // Fetch item details with user info
+                const { data: itemData, error: itemError } = await supabase
+                    .from('items')
+                    .select('*, users(*)')
+                    .eq('id', id)
+                    .single();
+                
+                if (itemError) throw itemError;
+
+                // Fetch bill document if it exists
+                const { data: billData, error: billError } = await supabase
+                    .from('bill_documents')
+                    .select('*')
+                    .eq('item_id', id)
+                    .maybeSingle();
+
+                if (billError) throw billError;
+
+                setItem(itemData);
+                setBillDocument(billData);
+                setLoading(false);
+            } catch (error) {
+                console.error('Error fetching item details:', error);
+                setLoading(false);
+            }
         };
         if (id) fetchItem();
     }, [id]);
@@ -110,6 +130,38 @@ export default function ItemDetails() {
         }
     };
 
+    const handleDeleteBill = async () => {
+        if (!user || user.id !== item.user_id) return;
+
+        Alert.alert(
+            'Delete Bill Document',
+            'Are you sure you want to delete this bill document?',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            const { error } = await supabase
+                                .from('bill_documents')
+                                .delete()
+                                .eq('item_id', id);
+
+                            if (error) throw error;
+
+                            setBillDocument(null);
+                            Alert.alert('Success', 'Bill document deleted successfully');
+                        } catch (error) {
+                            console.error('Error deleting bill:', error);
+                            Alert.alert('Error', 'Failed to delete bill document');
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
     if (loading) {
         return (
             <View style={styles.centered}><ActivityIndicator size="large" color="#075eec" /></View>
@@ -142,6 +194,45 @@ export default function ItemDetails() {
                     <View style={styles.divider} />
                     <View style={styles.row}><Ionicons name="person-circle-outline" size={20} color="#FFA500" /><Text style={styles.label}> Listed by</Text></View>
                     <Text style={styles.text}>{item.users?.name || 'User'}</Text>
+
+                    {/* Bill Document Section */}
+                    {billDocument && (
+                        <>
+                            <View style={styles.divider} />
+                            <View style={styles.row}>
+                                <MaterialCommunityIcons name="file-document-outline" size={20} color="#4B5563" />
+                                <Text style={styles.label}> Bill Document</Text>
+                            </View>
+                            <View style={styles.billDocumentContainer}>
+                                <Image 
+                                    source={{ uri: billDocument.document_url }} 
+                                    style={styles.billThumbnail}
+                                    resizeMode="cover"
+                                />
+                                <View style={styles.billInfo}>
+                                    <Text style={styles.billText}>Bill Document</Text>
+                                    <Text style={styles.billSubtext}>
+                                        {user?.id === item.user_id ? 'You uploaded this bill' : 'Uploaded by item owner'}
+                                    </Text>
+                                </View>
+                                {user?.id === item.user_id ? (
+                                    <TouchableOpacity 
+                                        onPress={handleDeleteBill}
+                                        style={styles.billDeleteButton}
+                                    >
+                                        <MaterialCommunityIcons name="delete-outline" size={24} color="#EF4444" />
+                                    </TouchableOpacity>
+                                ) : (
+                                    <TouchableOpacity 
+                                        onPress={() => Linking.openURL(billDocument.document_url)}
+                                        style={styles.billViewButton}
+                                    >
+                                        <MaterialCommunityIcons name="eye-outline" size={24} color="#3B82F6" />
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+                        </>
+                    )}
 
                     {/* Only show propose button if user is logged in AND is not the item owner */}
                     {user && user.id !== item.user_id ? (
@@ -360,5 +451,45 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontSize: 16,
         fontWeight: 'bold',
+    },
+    billDocumentContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F3F4F6',
+        borderRadius: 12,
+        padding: 12,
+        marginTop: 8,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+    },
+    billThumbnail: {
+        width: 60,
+        height: 60,
+        borderRadius: 8,
+        backgroundColor: '#E5E7EB',
+    },
+    billInfo: {
+        flex: 1,
+        marginLeft: 12,
+    },
+    billText: {
+        fontSize: 16,
+        fontWeight: '500',
+        color: '#1F2937',
+    },
+    billSubtext: {
+        fontSize: 14,
+        color: '#6B7280',
+        marginTop: 2,
+    },
+    billDeleteButton: {
+        padding: 8,
+        borderRadius: 8,
+        backgroundColor: '#FEE2E2',
+    },
+    billViewButton: {
+        padding: 8,
+        borderRadius: 8,
+        backgroundColor: '#EBF5FF',
     },
 }); 
