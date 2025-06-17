@@ -144,6 +144,7 @@ export default function Profile() {
         .from('items')
         .select('*')
         .eq('user_id', authUser.id)
+        .not('status', 'eq', 'removed')  // Don't show removed items
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -493,6 +494,24 @@ export default function Profile() {
     }
   };
 
+  const handleRemoveItem = async (itemId) => {
+    try {
+      const { error } = await supabase.rpc('remove_item', {
+        p_item_id: itemId,
+        p_user_id: user.id
+      });
+
+      if (error) throw error;
+      
+      // Refresh listings
+      fetchMyListings();
+      Alert.alert('Success', 'Item removed successfully');
+    } catch (error) {
+      console.error('Error removing item:', error);
+      Alert.alert('Error', 'Failed to remove item');
+    }
+  };
+
   if (loading) {
     return (
       <View style={styles.loading}>
@@ -599,11 +618,34 @@ export default function Profile() {
         data={myListings}
         keyExtractor={item => item.id}
         renderItem={({ item }) => (
-          <TouchableOpacity style={styles.gridItem}>
+          <TouchableOpacity 
+            style={styles.gridItem}
+            onPress={() => router.push(`/item/${item.id}`)}
+          >
             <Image source={{ uri: item.image_url }} style={styles.gridImage} />
             <View style={styles.gridItemOverlay}>
               <Text style={styles.gridTitle} numberOfLines={1}>{item.title}</Text>
+              <View style={[styles.statusBadge, styles[`status${item.status}`]]}>
+                <Text style={styles.statusText}>
+                  {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+                </Text>
+              </View>
             </View>
+            <TouchableOpacity 
+              style={styles.removeButton}
+              onPress={() => {
+                Alert.alert(
+                  'Remove Item',
+                  'Are you sure you want to remove this item?',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Remove', style: 'destructive', onPress: () => handleRemoveItem(item.id) }
+                  ]
+                );
+              }}
+            >
+              <MaterialCommunityIcons name="close-circle" size={24} color="#FF3B30" />
+            </TouchableOpacity>
           </TouchableOpacity>
         )}
         numColumns={NUM_COLUMNS}
@@ -623,7 +665,10 @@ export default function Profile() {
         data={favoriteItems}
         keyExtractor={item => item.id}
         renderItem={({ item }) => (
-          <TouchableOpacity style={styles.gridItem}>
+          <TouchableOpacity 
+            style={styles.gridItem}
+            onPress={() => router.push(`/item/${item.id}`)}
+          >
             <Image source={{ uri: item.image_url }} style={styles.gridImage} />
             <View style={styles.gridItemOverlay}>
               <Text style={styles.gridTitle} numberOfLines={1}>{item.title}</Text>
@@ -980,66 +1025,30 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
-    marginLeft: 8,
+    marginTop: 4,
   },
-  statuspending: {
-    backgroundColor: '#FEF3C7',
+  statusavailable: {
+    backgroundColor: 'rgba(16, 185, 129, 0.9)', // Green
   },
-  statusaccepted: {
-    backgroundColor: '#D1FAE5',
+  statusproposed: {
+    backgroundColor: 'rgba(245, 158, 11, 0.9)', // Orange
   },
-  statusrejected: {
-    backgroundColor: '#FEE2E2',
-  },
-  statuscancelled: {
-    backgroundColor: '#E5E7EB',
+  statusbartered: {
+    backgroundColor: 'rgba(59, 130, 246, 0.9)', // Blue
   },
   statusText: {
-    fontSize: 12,
-    fontWeight: '600',
-    textTransform: 'capitalize',
-  },
-  proposalText: {
-    fontSize: 14,
-    color: '#4B5563',
-    marginBottom: 8,
-  },
-  bold: {
-    fontWeight: '600',
-    color: '#1F2937',
-  },
-  proposalActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 12,
-    marginTop: 12,
-  },
-  actionButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    minWidth: 80,
-    alignItems: 'center',
-  },
-  acceptButton: {
-    backgroundColor: '#10B981',
-  },
-  rejectButton: {
-    backgroundColor: '#EF4444',
-  },
-  cancelButton: {
-    backgroundColor: '#6B7280',
-  },
-  actionButtonText: {
     color: '#fff',
+    fontSize: 10,
     fontWeight: '600',
-    fontSize: 14,
   },
-  emptyText: {
-    textAlign: 'center',
-    color: '#6B7280',
-    fontStyle: 'italic',
-    marginVertical: 12,
+  removeButton: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 12,
+    padding: 4,
+    zIndex: 3,
   },
 });
 

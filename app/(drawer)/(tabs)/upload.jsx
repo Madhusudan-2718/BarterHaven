@@ -278,7 +278,7 @@ export default function UploadScreen({ navigation }) {
                         image_url: imageUrl,
                         user_id: user.id,
                         created_at: new Date().toISOString(),
-                        status: 'active',
+                        status: 'available',
                         category: category,
                         offering,
                         exchangefor,

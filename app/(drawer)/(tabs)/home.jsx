@@ -42,6 +42,7 @@ export default function Home({ navigation }) {
       const { data, error } = await supabase
         .from('items')
         .select('*, users: user_id (name, profile_image_url)')
+        .neq('status', 'removed')
         .order('created_at', { ascending: false })
         .limit(20);
 
@@ -180,6 +181,12 @@ export default function Home({ navigation }) {
         <View style={styles.barterTypeTag}>
           <Text style={styles.barterTypeText}>{item.bartertype || "Online Barter"}</Text>
         </View>
+        <View style={styles.categoryTag}>
+          <Text style={styles.categoryText}>{item.category}</Text>
+        </View>
+        <View style={[styles.statusTag, styles[`status${item.status}`]]}>
+          <Text style={styles.statusText}>{item.status.charAt(0).toUpperCase() + item.status.slice(1)}</Text>
+        </View>
       </View>
       <View style={styles.userInfoRow}>
         {item.users?.profile_image_url ? (
@@ -283,7 +290,7 @@ export default function Home({ navigation }) {
               >
                 <View style={styles.categoryInner}>
                   <Image source={category.image} style={styles.categoryIcon} />
-                  <Text style={styles.categoryText}>{category.name}</Text>
+                  <Text style={styles.categoryName}>{category.name}</Text>
                 </View>
               </TouchableOpacity>
             ))}
@@ -455,7 +462,7 @@ const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: '#fff',
     borderRadius: 12,
-    padding: 8,
+    padding: 6,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
@@ -469,13 +476,17 @@ const styles = StyleSheet.create({
   categoryIcon: {
     width: 32,
     height: 32,
-    marginBottom: 6,
+    marginBottom: 8,
+    resizeMode: 'contain',
   },
-  categoryText: {
+  categoryName: {
     fontSize: 11,
     fontWeight: '600',
     color: '#3B82F6',
     textAlign: 'center',
+    marginTop: 4,
+    fontFamily: 'Outfit',
+    width: '100%',
   },
   latestListingsContainer: {
     marginTop: 16,
@@ -492,20 +503,20 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   productCard: {
-    width: '100%',
+    width: '92%',
+    alignSelf: 'center',
     backgroundColor: '#fff',
-    borderRadius: 24,
+    borderRadius: 20,
     marginVertical: 12,
     padding: 0,
-    shadowColor: '#075eec',
-    shadowOffset: { width: 0, height: 4 },
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.12,
-    shadowRadius: 16,
-    elevation: 6,
+    shadowRadius: 24,
+    elevation: 8,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: 'rgba(229, 231, 235, 0.5)',
     overflow: 'hidden',
-    position: 'relative',
   },
   imageWrapper: {
     width: '100%',
@@ -518,114 +529,155 @@ const styles = StyleSheet.create({
   productImage: {
     width: '100%',
     height: '100%',
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
   },
   favoriteIcon: {
     position: 'absolute',
-    top: 10,
-    right: 10,
-    backgroundColor: 'rgba(255,255,255,0.85)',
-    borderRadius: 16,
-    padding: 4,
+    top: 12,
+    right: 12,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    borderRadius: 12,
+    padding: 8,
     zIndex: 2,
-    elevation: 2,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  barterTypeTag: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    backgroundColor: 'rgba(255, 165, 0, 0.9)',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    zIndex: 2,
+  },
+  barterTypeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  categoryTag: {
+    position: 'absolute',
+    top: 50,
+    left: 12,
+    backgroundColor: 'rgba(108, 46, 183, 0.9)',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    zIndex: 2,
+  },
+  categoryText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700',
   },
   userInfoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 8,
-    marginLeft: 12,
+    marginTop: 16,
+    marginHorizontal: 16,
+    marginBottom: 8,
   },
   avatarCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: '#b0bec5',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 8,
+    marginRight: 12,
     overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   avatarText: {
     color: '#fff',
     fontWeight: 'bold',
-    fontSize: 16,
+    fontSize: 18,
   },
   username: {
-    fontWeight: '500',
-    fontSize: 14,
+    fontWeight: '600',
+    fontSize: 15,
+    color: '#1F2937',
   },
   section: {
     marginTop: 12,
-    marginHorizontal: 12,
-    backgroundColor: '#F8F9FA',
-    borderRadius: 12,
-    padding: 10,
+    marginHorizontal: 16,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    padding: 12,
     borderWidth: 1,
-    borderColor: '#E9ECEF',
+    borderColor: '#E2E8F0',
   },
   label: {
-    fontWeight: '600',
+    fontWeight: '700',
     fontSize: 12,
-    color: '#6c757d',
+    color: '#64748B',
     marginBottom: 4,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   offerTitle: {
     fontWeight: '600',
-    fontSize: 14,
-    color: '#212529',
+    fontSize: 15,
+    color: '#1F2937',
     flex: 1,
   },
   exchangeTitle: {
     fontWeight: '600',
-    fontSize: 14,
-    color: '#212529',
-    flex: 1,
-  },
-  tag: {
-    backgroundColor: '#ffe082',
-    borderRadius: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    marginLeft: 8,
-  },
-  tagText: {
-    fontSize: 11,
-    color: '#333',
-  },
-  viewDetailsButton: {
-    backgroundColor: '#00796b',
-    borderRadius: 20,
-    paddingVertical: 8,
-    paddingHorizontal: 24,
-    alignSelf: 'center',
-    marginTop: 12,
-    marginBottom: 10,
-  },
-  viewDetailsText: {
-    color: '#fff',
-    fontWeight: 'bold',
     fontSize: 15,
+    color: '#1F2937',
+    flex: 1,
   },
   actionRow: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     gap: 16,
-    marginTop: 10,
+    marginTop: 16,
     marginBottom: 16,
+    paddingHorizontal: 16,
+  },
+  viewDetailsButton: {
+    backgroundColor: '#3B82F6',
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    flex: 1,
+    alignItems: 'center',
+    shadowColor: '#3B82F6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  viewDetailsText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 15,
   },
   deleteButton: {
-    backgroundColor: '#d9534f',
-    borderRadius: 20,
-    paddingVertical: 8,
+    backgroundColor: '#EF4444',
+    borderRadius: 14,
+    paddingVertical: 12,
     paddingHorizontal: 16,
-    marginLeft: 12,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#EF4444',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
   },
   chatButton: {
     backgroundColor: '#10B981',
@@ -644,26 +696,34 @@ const styles = StyleSheet.create({
     padding: 10,
     backgroundColor: '#F3F4F6',
   },
-  barterTypeTag: {
-    position: 'absolute',
-    top: 10,
-    left: 10,
-    backgroundColor: '#FFA500',
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 2,
-    zIndex: 2,
-  },
-  barterTypeText: {
-    color: '#6c2eb7',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
   contentContainerStyle: { 
     flexGrow: 1, 
     backgroundColor: '#F3F4F6',
     paddingBottom: 10,
     paddingTop: 0,
     paddingHorizontal: 0 // Remove horizontal padding since banner has its own margin
+  },
+  statusTag: {
+    position: 'absolute',
+    top: 88,
+    left: 12,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    zIndex: 2,
+  },
+  statusavailable: {
+    backgroundColor: 'rgba(16, 185, 129, 0.9)', // Green
+  },
+  statusproposed: {
+    backgroundColor: 'rgba(245, 158, 11, 0.9)', // Orange
+  },
+  statusbartered: {
+    backgroundColor: 'rgba(59, 130, 246, 0.9)', // Blue
+  },
+  statusText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700',
   },
 });

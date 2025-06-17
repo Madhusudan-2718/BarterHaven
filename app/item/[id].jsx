@@ -5,6 +5,7 @@ import { supabase } from '@/Config/supabaseConfig';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 import { useAuth } from '@/Config/AuthContext';
+import ItemMatches from '../components/ItemMatches';
 
 const { width } = Dimensions.get('window');
 
@@ -51,83 +52,72 @@ export default function ItemDetails() {
         if (id) fetchItem();
     }, [id]);
 
-    const handleProposeTrade = async () => {
+    const handleProposeTrade = async (matchedItemId) => {
         if (!user) {
             Alert.alert('Error', 'Please sign in to propose a trade');
             return;
         }
 
-        if (!proposedItemDescription.trim()) {
-            Alert.alert('Error', 'Please describe what you are offering in exchange');
+        if (user.id === item.user_id) {
+            Alert.alert('Error', 'You cannot propose a trade on your own item');
             return;
         }
 
-        setSubmitting(true);
-        try {
-            // First check if user is the item owner
-            if (user.id === item.user_id) {
-                Alert.alert('Error', 'You cannot propose a trade on your own item');
-                return;
-            }
+        // Check if user already has a pending proposal
+        const { data: existingProposals, error: checkError } = await supabase
+            .from('trade_proposals')
+            .select('id')
+            .eq('item_id', id)
+            .eq('proposer_id', user.id)
+            .eq('status', 'pending');
 
-            // Check if user already has a pending proposal
-            const { data: existingProposals, error: checkError } = await supabase
-                .from('trade_proposals')
-                .select('id')
-                .eq('item_id', id)
-                .eq('proposer_id', user.id)
-                .eq('status', 'pending');
-
-            if (checkError) {
-                throw checkError;
-            }
-
-            if (existingProposals && existingProposals.length > 0) {
-                Alert.alert(
-                    'Already Proposed',
-                    'You already have a pending trade proposal for this item.',
-                    [{ text: 'OK' }]
-                );
-                return;
-            }
-
-            // Create the trade proposal
-            const { data: proposal, error } = await supabase
-                .from('trade_proposals')
-                .insert([
-                    {
-                        item_id: id,
-                        proposer_id: user.id,
-                        proposed_item_description: proposedItemDescription.trim(),
-                        message: message.trim() || null,
-                        status: 'pending'
-                    }
-                ])
-                .select()
-                .single();
-
-            if (error) {
-                throw error;
-            }
-
-            Alert.alert(
-                'Success',
-                'Trade proposal sent successfully!',
-                [{ text: 'OK', onPress: () => setShowProposeModal(false) }]
-            );
-
-            // Reset form
-            setProposedItemDescription('');
-            setMessage('');
-        } catch (error) {
-            console.error('Error proposing trade:', error);
-            Alert.alert(
-                'Error',
-                'Failed to send trade proposal. Please try again.'
-            );
-        } finally {
-            setSubmitting(false);
+        if (checkError) {
+            console.error('Error checking existing proposals:', checkError);
+            Alert.alert('Error', 'Failed to check existing proposals');
+            return;
         }
+
+        if (existingProposals && existingProposals.length > 0) {
+            Alert.alert(
+                'Already Proposed',
+                'You already have a pending trade proposal for this item.',
+                [{ text: 'OK' }]
+            );
+            return;
+        }
+
+        // Get matched item details
+        const { data: matchedItem, error: matchedItemError } = await supabase
+            .from('items')
+            .select('title, description')
+            .eq('id', matchedItemId)
+            .single();
+
+        if (matchedItemError) {
+            console.error('Error fetching matched item:', matchedItemError);
+            Alert.alert('Error', 'Failed to fetch matched item details');
+            return;
+        }
+
+        // Create the trade proposal
+        const { error } = await supabase
+            .from('trade_proposals')
+            .insert([
+                {
+                    item_id: id,
+                    proposer_id: user.id,
+                    proposed_item_description: `Offering: ${matchedItem.title}\n${matchedItem.description || ''}`,
+                    status: 'pending'
+                }
+            ]);
+
+        if (error) {
+            console.error('Error creating proposal:', error);
+            Alert.alert('Error', 'Failed to create trade proposal');
+            return;
+        }
+
+        Alert.alert('Success', 'Trade proposal sent successfully');
     };
 
     const handleDeleteBill = async () => {
@@ -291,7 +281,7 @@ export default function ItemDetails() {
 
                         <TouchableOpacity
                             style={[styles.submitButton, submitting && styles.submitButtonDisabled]}
-                            onPress={handleProposeTrade}
+                            onPress={() => handleProposeTrade(proposedItemDescription)}
                             disabled={submitting}
                         >
                             {submitting ? (
@@ -303,6 +293,10 @@ export default function ItemDetails() {
                     </View>
                 </View>
             </Modal>
+
+            {item && item.status === 'available' && user?.id !== item.user_id && (
+                <ItemMatches itemId={id} onProposeTrade={handleProposeTrade} />
+            )}
         </ScrollView>
     );
 }

@@ -3,12 +3,14 @@ import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, Ima
 import { supabase } from '@/Config/supabaseConfig';
 import { useAuth } from '@/Config/AuthContext';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 
 export default function TradeProposals() {
     const [proposals, setProposals] = useState([]);
     const [loading, setLoading] = useState(true);
     const [itemTitles, setItemTitles] = useState({}); // Cache for missing item titles
     const { user } = useAuth();
+    const router = useRouter();
 
     useEffect(() => {
         if (user) {
@@ -146,7 +148,10 @@ export default function TradeProposals() {
                     const placeholderImage = 'https://via.placeholder.com/60x60?text=No+Image';
                     return (
                         <View key={proposal.id} style={styles.proposalCard}>
-                            <View style={styles.proposalHeaderWithImage}>
+                            <TouchableOpacity 
+                                style={styles.proposalHeaderWithImage}
+                                onPress={() => router.push(`/item/${proposal.item_id}`)}
+                            >
                                 <Image
                                     source={{ uri: itemImage || placeholderImage }}
                                     style={styles.itemImage}
@@ -160,7 +165,7 @@ export default function TradeProposals() {
                                         {proposal.status.charAt(0).toUpperCase() + proposal.status.slice(1)}
                                     </Text>
                                 </View>
-                            </View>
+                            </TouchableOpacity>
                             <Text style={styles.proposalInfo}>
                                 {user.id === proposal.proposer_id ? 'You proposed to trade' : 'Someone proposed to trade'}
                             </Text>
