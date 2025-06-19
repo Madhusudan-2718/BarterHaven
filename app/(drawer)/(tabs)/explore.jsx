@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import {
     View,
     Text,
@@ -6,35 +6,41 @@ import {
     FlatList,
     Image,
     TouchableOpacity,
-    Alert,
-    ActivityIndicator,
-    TextInput,
-    ScrollView,
+    Dimensions,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { supabase } from '@/Config/supabaseConfig';
 import { categories } from '@/Config/categories';
 import { useRouter } from 'expo-router';
 
-export default function ExploreScreen({ navigation }) {
+const { width } = Dimensions.get('window');
+const numColumns = 3;
+const tileSize = (width - 48) / numColumns;
+
+export default function ExploreScreen() {
     const router = useRouter();
 
+    const renderCategory = ({ item }) => (
+        <TouchableOpacity
+            style={styles.categoryTile}
+            onPress={() => router.push(`/category/${item.name}`)}
+        >
+            <View style={styles.imageContainer}>
+                <Image source={item.image} style={styles.categoryImage} />
+            </View>
+            <Text style={styles.categoryName}>{item.name}</Text>
+        </TouchableOpacity>
+    );
+
     return (
-        <FlatList
-            style={styles.container}
-            ListHeaderComponent={<Text style={styles.header}>Explore Categories</Text>}
-            data={categories}
-            renderItem={({ item }) => (
-                <TouchableOpacity style={styles.categoryItem} onPress={() => router.push(`/category/${item.name}`)}>
-                    <Image source={item.image} style={styles.categoryImage} />
-                    <Text style={styles.categoryName}>{item.name}</Text>
-                </TouchableOpacity>
-            )}
-            keyExtractor={(item) => item.name}
-            numColumns={3}
-            contentContainerStyle={styles.gridContainer}
-            showsVerticalScrollIndicator={false}
-        />
+        <View style={styles.container}>
+            <FlatList
+                data={categories}
+                renderItem={renderCategory}
+                keyExtractor={(item) => item.name}
+                numColumns={numColumns}
+                contentContainerStyle={styles.gridContainer}
+                showsVerticalScrollIndicator={false}
+            />
+        </View>
     );
 }
 
@@ -42,46 +48,41 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: '#F3F4F6',
-        paddingTop: 20,
-    },
-    header: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        color: '#1F2937',
-        textAlign: 'center',
-        marginBottom: 20,
     },
     gridContainer: {
-        paddingHorizontal: 10,
-        paddingBottom: 20,
+        padding: 16,
     },
-    categoryItem: {
-        flex: 1,
-        alignItems: 'center',
-        margin: 10,
+    categoryTile: {
+        width: tileSize,
+        aspectRatio: 1,
+        margin: 4,
         backgroundColor: '#fff',
         borderRadius: 12,
-        padding: 16,
-        borderWidth: 1,
-        borderColor: '#E5E7EB',
+        padding: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.08,
-        shadowRadius: 3,
-        elevation: 2,
-        minWidth: 90,
-        maxWidth: 120,
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
+    },
+    imageContainer: {
+        width: '70%',
+        aspectRatio: 1,
+        marginBottom: 8,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     categoryImage: {
-        width: 50,
-        height: 50,
-        marginBottom: 8,
+        width: '100%',
+        height: '100%',
         resizeMode: 'contain',
     },
     categoryName: {
-        fontSize: 13,
-        fontWeight: '600',
-        color: '#3B82F6',
+        fontSize: 12,
+        fontWeight: '500',
+        color: '#1F2937',
         textAlign: 'center',
     },
 });

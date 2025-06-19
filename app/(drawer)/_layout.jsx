@@ -1,169 +1,245 @@
-import { View, Text, StyleSheet, Alert, Image } from 'react-native';
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Drawer } from 'expo-router/drawer';
-import { DrawerContentScrollView, DrawerItem } from '@react-navigation/drawer';
-import Ionicons from '@expo/vector-icons/Ionicons';
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { usePathname, useRouter } from 'expo-router';
-import { supabase } from '@/Config/supabaseConfig';
-import { useAuth } from '@/Config/AuthContext';
+import { Ionicons } from '@expo/vector-icons';
 import { useColorScheme } from 'react-native';
+import { DrawerContentScrollView, DrawerItemList, DrawerItem } from '@react-navigation/drawer';
+import { View, Text, StyleSheet, Image, Alert, Animated, Pressable } from 'react-native';
+import { useAuth } from '@/Config/AuthContext';
+import { supabase } from '@/Config/supabaseConfig';
 
-const CustomDrawerContent = (props) => {
-    const router = useRouter();
-    const pathname = usePathname();
-    const { user, signOut } = useAuth();
+function CustomDrawerContent(props) {
+    const { user } = useAuth();
+    const [profile, setProfile] = React.useState(null);
+    const { state } = props;
+    const currentRoute = state?.routeNames[state.index] || '';
 
-    const [userName, setUserName] = useState('');
-    const [userEmail, setUserEmail] = useState(user?.email || '');
-    const [userPhoto, setUserPhoto] = useState(null);
-
-    useEffect(() => {
+    React.useEffect(() => {
         if (user) {
-            // Fetch user profile from Supabase
-            const fetchUserProfile = async () => {
-                try {
-                    const { data: profile, error } = await supabase
-                        .from('users')
-                        .select('*')
-                        .eq('id', user.id)
-                        .single();
-
-                    if (error) throw error;
-
-                    if (profile) {
-                        setUserName(profile.name || '');
-                        setUserPhoto(profile.profile_image_url);
-                    }
-                } catch (error) {
-                    console.error('Error fetching user profile:', error);
-                }
-            };
-
-            fetchUserProfile();
+            fetchProfile();
         }
     }, [user]);
+
+    const fetchProfile = async () => {
+        const { data, error } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', user.id)
+            .single();
+        if (!error && data) {
+            setProfile(data);
+        }
+    };
 
     const handleLogout = async () => {
         Alert.alert(
             'Logout',
             'Are you sure you want to logout?',
             [
-                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Cancel',
+                    style: 'cancel'
+                },
                 {
                     text: 'Logout',
+                    style: 'destructive',
                     onPress: async () => {
                         try {
-                            await signOut();
-                            router.replace('/');
+                            await supabase.auth.signOut();
                         } catch (error) {
-                            console.error("Logout error:", error);
-                            Alert.alert("Error", "Failed to logout.");
+                            console.error('Logout error:', error);
+                            Alert.alert('Error', 'Failed to logout. Please try again.');
                         }
-                    },
-                },
-            ]
+                    }
+                }
+            ],
+            { cancelable: true }
+        );
+    };
+
+    const getActiveColor = (routeName) => {
+        return currentRoute === routeName ? '#fff' : '#075eec';
+    };
+
+    const CustomDrawerItem = ({ label, iconName, routeName, onPress, isLogout = false }) => {
+        const [isHovered, setIsHovered] = React.useState(false);
+        const isActive = currentRoute === routeName;
+        const scaleAnim = React.useRef(new Animated.Value(1)).current;
+        
+        const startHoverAnimation = () => {
+            setIsHovered(true);
+            Animated.spring(scaleAnim, {
+                toValue: 1.02,
+                friction: 7,
+                tension: 40,
+                useNativeDriver: true
+            }).start();
+        };
+
+        const endHoverAnimation = () => {
+            setIsHovered(false);
+            Animated.spring(scaleAnim, {
+                toValue: 1,
+                friction: 7,
+                tension: 40,
+                useNativeDriver: true
+            }).start();
+        };
+
+        return (
+            <Pressable
+                onPressIn={startHoverAnimation}
+                onPressOut={endHoverAnimation}
+                onHoverIn={startHoverAnimation}
+                onHoverOut={endHoverAnimation}
+                onPress={onPress}
+                style={({ pressed }) => [
+                    styles.drawerItemContainer,
+                    (isActive || isHovered) && (isLogout ? styles.activeLogoutItem : styles.activeDrawerItem),
+                    pressed && styles.pressedDrawerItem
+                ]}
+            >
+                <Animated.View style={[
+                    styles.drawerItemContent,
+                    { transform: [{ scale: scaleAnim }] }
+                ]}>
+                    <Ionicons
+                        name={iconName}
+                        size={22}
+                        color={isLogout 
+                            ? (isHovered ? '#fff' : '#FF3B30') 
+                            : (isActive || isHovered ? '#fff' : '#075eec')}
+                    />
+                    <Text style={[
+                        styles.drawerLabel,
+                        isLogout ? styles.logoutLabel : null,
+                        (isActive || isHovered) && !isLogout && styles.activeDrawerLabel,
+                        isLogout && isHovered && styles.activeLogoutLabel
+                    ]}>
+                        {label}
+                    </Text>
+                </Animated.View>
+            </Pressable>
         );
     };
 
     return (
-        <DrawerContentScrollView {...props}>
-            {/* User Info Section */}
-            <View style={styles.userInfoContainer}>
-                {userPhoto ? (
-                    <Image source={{ uri: userPhoto }} style={styles.userImage} />
-                ) : (
-                    <Ionicons name="person-circle-outline" size={80} color="#075eec" />
-                )}
-                <Text style={{ fontFamily: 'outfit-bold', fontSize: 20 }}>Welcome,</Text>
-                <Text style={styles.userName}>{userName || "User Name"}</Text>
-                <Text style={styles.userEmail}>{userEmail}</Text>
+        <DrawerContentScrollView {...props} style={styles.drawerContent}>
+            {/* User Profile Section */}
+            <View style={styles.userSection}>
+                <View style={styles.profileImage}>
+                    {profile?.profile_image_url ? (
+                        <Image
+                            source={{ uri: profile.profile_image_url }}
+                            style={styles.avatar}
+                        />
+                    ) : (
+                        <View style={[styles.avatar, styles.defaultAvatar]}>
+                            <Text style={styles.avatarText}>
+                                {profile?.name?.[0]?.toUpperCase() || "?"}
+                            </Text>
+                        </View>
+                    )}
+                </View>
+                <Text style={styles.welcomeText}>Welcome,</Text>
+                <Text style={styles.userName}>{profile?.name || 'User'}</Text>
+                <Text style={styles.userEmail}>{user?.email}</Text>
             </View>
 
-            {/* Drawer Items */}
-            <DrawerItem
-                icon={({ size }) => (
-                    <Ionicons name="home" size={size} color={pathname === '/home' ? '#fff' : "#075eec"} />
-                )}
-                label={'Home'}
-                labelStyle={[styles.navItemLabel, { color: pathname === '/home' ? '#fff' : "#075eec" }]}
-                style={{ backgroundColor: pathname === '/home' ? '#075eec' : "#fff" }}
-                onPress={() => { router.push('(drawer)/(tabs)/home'); }}
-            />
-
-            <DrawerItem
-                icon={({ size }) => (
-                    <MaterialIcons name="account-circle" size={size} color={pathname === '/profile' ? '#fff' : "#075eec"} />
-                )}
-                label={'Profile'}
-                labelStyle={[styles.navItemLabel, { color: pathname === '/profile' ? '#fff' : "#075eec" }]}
-                style={{ backgroundColor: pathname === '/profile' ? '#075eec' : "#fff" }}
-                onPress={() => { router.push('(drawer)/(tabs)/profile'); }}
-            />
-
-            <DrawerItem
-                icon={({ size }) => (
-                    <Ionicons name="settings" size={size} color={pathname === '/settings' ? '#fff' : "#075eec"} />
-                )}
-                label={'Settings'}
-                labelStyle={[styles.navItemLabel, { color: pathname === '/settings' ? '#fff' : "#075eec" }]}
-                style={{ backgroundColor: pathname === '/settings' ? '#075eec' : "#fff" }}
-                onPress={() => { router.push('settings'); }}
-            />
-
-            <DrawerItem
-                icon={({ size }) => (
-                    <Ionicons name="log-out" size={size} color="#d9534f" />
-                )}
-                label={'Logout'}
-                labelStyle={[styles.navItemLabel, { color: "#d9534f" }]}
-                style={{ backgroundColor: "#fff" }}
-                onPress={handleLogout}
-            />
+            {/* Navigation Items */}
+            <View style={styles.drawerItems}>
+                <CustomDrawerItem
+                    label="Home"
+                    iconName="home-outline"
+                    routeName="(tabs)"
+                    onPress={() => props.navigation.navigate('(tabs)')}
+                />
+                <CustomDrawerItem
+                    label="Browse Items"
+                    iconName="search-outline"
+                    routeName="browse"
+                    onPress={() => props.navigation.navigate('browse')}
+                />
+                <CustomDrawerItem
+                    label="My Trades"
+                    iconName="swap-horizontal-outline"
+                    routeName="trades"
+                    onPress={() => props.navigation.navigate('trades')}
+                />
+                <CustomDrawerItem
+                    label="Settings"
+                    iconName="settings-outline"
+                    routeName="settings"
+                    onPress={() => props.navigation.navigate('settings')}
+                />
+                <CustomDrawerItem
+                    label="Logout"
+                    iconName="log-out-outline"
+                    routeName="logout"
+                    onPress={handleLogout}
+                    isLogout={true}
+                />
+            </View>
         </DrawerContentScrollView>
     );
-};
+}
 
-export default function Layout() {
-    const colorScheme = useColorScheme();
-    const { user, loading } = useAuth();
-
-    if (loading) {
-        return null;
-    }
-
+export default function DrawerLayout() {
     return (
         <Drawer
             drawerContent={(props) => <CustomDrawerContent {...props} />}
             screenOptions={{
-                headerStyle: {
-                    backgroundColor: colorScheme === 'dark' ? '#000' : '#fff',
-                },
-                headerTintColor: colorScheme === 'dark' ? '#fff' : '#000',
+                headerShown: false,
                 drawerStyle: {
                     backgroundColor: '#fff',
+                    width: 280,
                 },
-                drawerActiveTintColor: '#007AFF',
-                drawerInactiveTintColor: colorScheme === 'dark' ? '#fff' : '#000',
+                drawerActiveBackgroundColor: '#075eec',
+                drawerActiveTintColor: '#fff',
+                drawerInactiveTintColor: '#075eec',
             }}
         >
             <Drawer.Screen
                 name="(tabs)"
                 options={{
-                    title: 'Home',
                     headerShown: false,
-                    drawerIcon: ({ color, size }) => (
-                        <Ionicons name="home" size={size} color={color} />
-                    ),
+                }}
+            />
+            <Drawer.Screen
+                name="browse"
+                options={{
+                    headerShown: false,
+                }}
+            />
+            <Drawer.Screen
+                name="trades"
+                options={{
+                    headerShown: true,
+                    title: 'My Trades',
+                    headerStyle: {
+                        backgroundColor: '#fff',
+                    },
+                    headerTitleStyle: {
+                        color: '#075eec',
+                        fontFamily: 'outfit-bold',
+                        fontSize: 20,
+                    },
+                    headerTintColor: '#075eec',
                 }}
             />
             <Drawer.Screen
                 name="settings"
                 options={{
+                    headerShown: true,
                     title: 'Settings',
-                    drawerIcon: ({ color, size }) => (
-                        <Ionicons name="settings" size={size} color={color} />
-                    ),
+                    headerStyle: {
+                        backgroundColor: '#fff',
+                    },
+                    headerTitleStyle: {
+                        color: '#075eec',
+                        fontFamily: 'outfit-bold',
+                        fontSize: 20,
+                    },
+                    headerTintColor: '#075eec',
                 }}
             />
         </Drawer>
@@ -171,34 +247,92 @@ export default function Layout() {
 }
 
 const styles = StyleSheet.create({
-    userInfoContainer: {
-        alignItems: 'center',
-        paddingVertical: 20,
+    drawerContent: {
+        flex: 1,
+    },
+    userSection: {
+        padding: 16,
         borderBottomWidth: 1,
         borderBottomColor: '#E5E7EB',
-        backgroundColor: '#F3F4F6',
+        alignItems: 'center',
+        backgroundColor: '#fff',
     },
-    userImage: {
+    profileImage: {
+        marginBottom: 12,
+    },
+    avatar: {
         width: 80,
         height: 80,
         borderRadius: 40,
-        marginBottom: 10,
         borderWidth: 2,
-        borderColor: '#3B82F6',
+        borderColor: '#075eec',
+    },
+    defaultAvatar: {
+        backgroundColor: '#075eec',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    avatarText: {
+        color: '#fff',
+        fontSize: 32,
+        fontWeight: 'bold',
+    },
+    welcomeText: {
+        fontSize: 16,
+        color: '#6B7280',
+        fontFamily: 'outfit',
     },
     userName: {
-        fontSize: 18,
+        fontSize: 20,
         fontWeight: 'bold',
-        color: '#1F2937',
+        color: '#075eec',
+        marginTop: 4,
+        fontFamily: 'outfit-bold',
     },
     userEmail: {
         fontSize: 14,
         color: '#6B7280',
-    },
-    navItemLabel: {
-        marginLeft: -5,
+        marginTop: 4,
         fontFamily: 'outfit',
-        fontSize: 18,
-        color: '#1F2937',
+    },
+    drawerItems: {
+        flex: 1,
+        paddingTop: 8,
+    },
+    drawerItemContainer: {
+        marginHorizontal: 12,
+        marginVertical: 4,
+        borderRadius: 16,
+        overflow: 'hidden',
+    },
+    drawerItemContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 12,
+    },
+    activeDrawerItem: {
+        backgroundColor: '#075eec',
+    },
+    activeLogoutItem: {
+        backgroundColor: '#FF3B30',
+    },
+    pressedDrawerItem: {
+        opacity: 0.8,
+    },
+    drawerLabel: {
+        fontSize: 16,
+        fontWeight: '500',
+        fontFamily: 'outfit',
+        color: '#075eec',
+        marginLeft: 32,
+    },
+    activeDrawerLabel: {
+        color: '#fff',
+    },
+    logoutLabel: {
+        color: '#FF3B30',
+    },
+    activeLogoutLabel: {
+        color: '#fff',
     },
 });

@@ -6,6 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 import { useAuth } from '@/Config/AuthContext';
 import ItemMatches from '../components/ItemMatches';
+import ItemLocation from '../components/ItemLocation';
 
 const { width } = Dimensions.get('window');
 
@@ -18,6 +19,7 @@ export default function ItemDetails() {
     const [message, setMessage] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [billDocument, setBillDocument] = useState(null);
+    const [userLocation, setUserLocation] = useState(null);
     const { user } = useAuth();
 
     useEffect(() => {
@@ -49,8 +51,51 @@ export default function ItemDetails() {
                 setLoading(false);
             }
         };
-        if (id) fetchItem();
-    }, [id]);
+
+        const fetchUserLocation = async () => {
+            if (user) {
+                try {
+                    // Fallback: Get user location from Supabase directly
+                    const { data: locationData, error } = await supabase
+                        .from('users')
+                        .select(`
+                            latitude,
+                            longitude,
+                            address_street,
+                            address_city,
+                            address_region,
+                            address_postal_code,
+                            address_country,
+                            location
+                        `)
+                        .eq('id', user.id)
+                        .single();
+
+                    if (!error && locationData?.latitude && locationData?.longitude) {
+                        setUserLocation({
+                            latitude: locationData.latitude,
+                            longitude: locationData.longitude,
+                            address: {
+                                street: locationData.address_street || '',
+                                city: locationData.address_city || '',
+                                region: locationData.address_region || '',
+                                postalCode: locationData.address_postal_code || '',
+                                country: locationData.address_country || '',
+                                fullAddress: locationData.location || '',
+                            },
+                        });
+                    }
+                } catch (error) {
+                    console.error('Error fetching user location:', error);
+                }
+            }
+        };
+
+        if (id) {
+            fetchItem();
+            fetchUserLocation();
+        }
+    }, [id, user]);
 
     const handleProposeTrade = async (matchedItemId) => {
         if (!user) {
@@ -168,322 +213,166 @@ export default function ItemDetails() {
         <ScrollView contentContainerStyle={styles.bg}>
             <View style={styles.card}>
                 <Image source={{ uri: item.image_url }} style={styles.image} />
+                
                 <View style={styles.content}>
                     <Text style={styles.title}>{item.title}</Text>
-                    <View style={styles.row}><Ionicons name="information-circle-outline" size={20} color="#3B82F6" /><Text style={styles.label}> Description</Text></View>
-                    <Text style={styles.text}>{item.description}</Text>
-                    <View style={styles.divider} />
-                    <View style={styles.row}><MaterialCommunityIcons name="gift-outline" size={20} color="#10B981" /><Text style={styles.label}> Offering</Text></View>
-                    <Text style={styles.text}>{item.offering}</Text>
-                    <View style={styles.divider} />
-                    <View style={styles.row}><MaterialCommunityIcons name="swap-horizontal" size={20} color="#F59E42" /><Text style={styles.label}> In Exchange For</Text></View>
-                    <Text style={styles.text}>{item.exchangefor}</Text>
-                    <View style={styles.divider} />
-                    <View style={styles.row}><Ionicons name="pricetag-outline" size={20} color="#6c2eb7" /><Text style={styles.label}> Category</Text></View>
-                    <Text style={styles.text}>{item.category}</Text>
-                    <View style={styles.divider} />
-                    <View style={styles.row}><Ionicons name="person-circle-outline" size={20} color="#FFA500" /><Text style={styles.label}> Listed by</Text></View>
-                    <Text style={styles.text}>{item.users?.name || 'User'}</Text>
+                    <Text style={styles.description}>{item.description}</Text>
+                    
+                    <View style={styles.details}>
+                        <View style={styles.detailRow}>
+                            <Ionicons name="pricetag" size={16} color="#6B7280" />
+                            <Text style={styles.detailText}>Category: {item.category}</Text>
+                        </View>
+                        
+                        <View style={styles.detailRow}>
+                            <Ionicons name="checkmark-circle" size={16} color="#6B7280" />
+                            <Text style={styles.detailText}>Condition: {item.condition}</Text>
+                        </View>
+                        
+                        <View style={styles.detailRow}>
+                            <Ionicons name="swap-horizontal" size={16} color="#6B7280" />
+                            <Text style={styles.detailText}>Barter Type: {item.bartertype}</Text>
+                        </View>
+                    </View>
 
-                    {/* Bill Document Section */}
+                    <ItemLocation item={item} userLocation={userLocation} />
+                    
+                    <View style={styles.userInfo}>
+                        <Image 
+                            source={{ uri: item.users?.profile_image_url || require('../../assets/images/default-profile.png') }} 
+                            style={styles.userImage} 
+                        />
+                        <View style={styles.userDetails}>
+                            <Text style={styles.userName}>{item.users?.name || 'Unknown User'}</Text>
+                            <Text style={styles.userRating}>⭐ 5.0 (10 reviews)</Text>
+                        </View>
+                    </View>
+
                     {billDocument && (
-                        <>
-                            <View style={styles.divider} />
-                            <View style={styles.row}>
-                                <MaterialCommunityIcons name="file-document-outline" size={20} color="#4B5563" />
-                                <Text style={styles.label}> Bill Document</Text>
-                            </View>
-                            <View style={styles.billDocumentContainer}>
-                                <Image 
-                                    source={{ uri: billDocument.document_url }} 
-                                    style={styles.billThumbnail}
-                                    resizeMode="cover"
-                                />
-                                <View style={styles.billInfo}>
-                                    <Text style={styles.billText}>Bill Document</Text>
-                                    <Text style={styles.billSubtext}>
-                                        {user?.id === item.user_id ? 'You uploaded this bill' : 'Uploaded by item owner'}
-                                    </Text>
-                                </View>
-                                {user?.id === item.user_id ? (
-                                    <TouchableOpacity 
-                                        onPress={handleDeleteBill}
-                                        style={styles.billDeleteButton}
-                                    >
-                                        <MaterialCommunityIcons name="delete-outline" size={24} color="#EF4444" />
-                                    </TouchableOpacity>
-                                ) : (
-                                    <TouchableOpacity 
-                                        onPress={() => Linking.openURL(billDocument.document_url)}
-                                        style={styles.billViewButton}
-                                    >
-                                        <MaterialCommunityIcons name="eye-outline" size={24} color="#3B82F6" />
+                        <View style={styles.billSection}>
+                            <Text style={styles.billTitle}>Bill Document</Text>
+                            <View style={styles.billInfo}>
+                                <Ionicons name="document" size={20} color="#3B82F6" />
+                                <Text style={styles.billText}>Bill document available</Text>
+                                {user && user.id === item.user_id && (
+                                    <TouchableOpacity onPress={handleDeleteBill}>
+                                        <Ionicons name="trash" size={20} color="#EF4444" />
                                     </TouchableOpacity>
                                 )}
                             </View>
-                        </>
+                        </View>
                     )}
 
-                    {/* Only show propose button if user is logged in AND is not the item owner */}
-                    {user && user.id !== item.user_id ? (
-                        <TouchableOpacity
-                            style={styles.proposeButton}
-                            onPress={() => setShowProposeModal(true)}
-                        >
-                            <Text style={styles.proposeButtonText}>Propose Trade</Text>
-                        </TouchableOpacity>
-                    ) : !user ? (
-                        <TouchableOpacity
-                            style={[styles.proposeButton, styles.proposeButtonDisabled]}
-                            onPress={() => Alert.alert('Sign In Required', 'Please sign in to propose a trade')}
-                        >
-                            <Text style={styles.proposeButtonText}>Sign In to Trade</Text>
-                        </TouchableOpacity>
-                    ) : null}
+                    <ItemMatches itemId={id} onProposeTrade={handleProposeTrade} />
                 </View>
             </View>
-
-            {/* Trade Proposal Modal */}
-            <Modal
-                visible={showProposeModal}
-                animationType="slide"
-                transparent={true}
-                onRequestClose={() => setShowProposeModal(false)}
-            >
-                <View style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
-                        <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Propose a Trade</Text>
-                            <TouchableOpacity onPress={() => setShowProposeModal(false)}>
-                                <Feather name="x" size={24} color="#666" />
-                            </TouchableOpacity>
-                        </View>
-
-                        <Text style={styles.modalLabel}>What are you offering in exchange?</Text>
-                        <TextInput
-                            style={styles.modalInput}
-                            value={proposedItemDescription}
-                            onChangeText={setProposedItemDescription}
-                            placeholder="Describe what you want to trade..."
-                            multiline
-                            numberOfLines={3}
-                        />
-
-                        <Text style={styles.modalLabel}>Message (Optional)</Text>
-                        <TextInput
-                            style={styles.modalInput}
-                            value={message}
-                            onChangeText={setMessage}
-                            placeholder="Add a message to the owner..."
-                            multiline
-                            numberOfLines={3}
-                        />
-
-                        <TouchableOpacity
-                            style={[styles.submitButton, submitting && styles.submitButtonDisabled]}
-                            onPress={() => handleProposeTrade(proposedItemDescription)}
-                            disabled={submitting}
-                        >
-                            {submitting ? (
-                                <ActivityIndicator color="#fff" />
-                            ) : (
-                                <Text style={styles.submitButtonText}>Send Proposal</Text>
-                            )}
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            </Modal>
-
-            {item && item.status === 'available' && user?.id !== item.user_id && (
-                <ItemMatches itemId={id} onProposeTrade={handleProposeTrade} />
-            )}
         </ScrollView>
     );
 }
 
 const styles = StyleSheet.create({
     bg: {
-        flexGrow: 1,
-        backgroundColor: '#f0f4f8',
-        alignItems: 'center',
-        paddingVertical: 30,
+        backgroundColor: '#F3F4F6',
         minHeight: '100%',
     },
     card: {
-        width: width * 0.93,
         backgroundColor: '#fff',
-        borderRadius: 24,
-        shadowColor: '#075eec',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.15,
-        shadowRadius: 24,
-        elevation: 8,
+        margin: 16,
+        borderRadius: 12,
         overflow: 'hidden',
-        marginBottom: 30,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
     },
     image: {
         width: '100%',
-        height: 320,
-        borderTopLeftRadius: 24,
-        borderTopRightRadius: 24,
-        backgroundColor: '#eee',
-        borderBottomWidth: 1,
-        borderColor: '#E5E7EB',
+        height: 300,
+        resizeMode: 'cover',
     },
     content: {
-        padding: 22,
+        padding: 16,
     },
     title: {
-        fontSize: 26,
+        fontSize: 24,
         fontWeight: 'bold',
-        color: '#2E3192',
-        marginBottom: 18,
-        textAlign: 'center',
-        letterSpacing: 0.5,
+        color: '#1F2937',
+        marginBottom: 8,
     },
-    label: {
-        fontWeight: '600',
+    description: {
         fontSize: 16,
-        color: '#374151',
-        marginLeft: 6,
+        color: '#6B7280',
+        marginBottom: 16,
+        lineHeight: 24,
     },
-    text: {
-        fontSize: 16,
-        color: '#212529',
-        marginBottom: 12,
-        marginTop: 2,
-        lineHeight: 22,
+    details: {
+        marginBottom: 16,
     },
-    divider: {
-        height: 1,
-        backgroundColor: '#E5E7EB',
-        marginVertical: 10,
-        borderRadius: 1,
-    },
-    row: {
+    detailRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginTop: 8,
+        marginBottom: 8,
+    },
+    detailText: {
+        marginLeft: 8,
+        fontSize: 14,
+        color: '#374151',
+    },
+    userInfo: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 12,
+        backgroundColor: '#F9FAFB',
+        borderRadius: 8,
+        marginBottom: 16,
+    },
+    userImage: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        marginRight: 12,
+    },
+    userDetails: {
+        flex: 1,
+    },
+    userName: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#374151',
+    },
+    userRating: {
+        fontSize: 14,
+        color: '#6B7280',
+        marginTop: 2,
+    },
+    billSection: {
+        marginBottom: 16,
+    },
+    billTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#374151',
+        marginBottom: 8,
+    },
+    billInfo: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 12,
+        backgroundColor: '#EFF6FF',
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#DBEAFE',
+    },
+    billText: {
+        flex: 1,
+        marginLeft: 8,
+        fontSize: 14,
+        color: '#1E40AF',
     },
     centered: {
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: '#f0f4f8',
-    },
-    proposeButton: {
-        backgroundColor: '#10B981',
-        borderRadius: 12,
-        paddingVertical: 12,
-        paddingHorizontal: 24,
-        marginTop: 20,
-        alignItems: 'center',
-    },
-    proposeButtonDisabled: {
-        backgroundColor: '#9CA3AF',
-    },
-    proposeButtonText: {
-        color: '#fff',
-        fontSize: 16,
-        fontWeight: 'bold',
-    },
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    modalContent: {
-        width: width * 0.9,
-        backgroundColor: '#fff',
-        borderRadius: 20,
-        padding: 20,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 4,
-        elevation: 5,
-    },
-    modalHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 20,
-    },
-    modalTitle: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        color: '#1F2937',
-    },
-    modalLabel: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#4B5563',
-        marginBottom: 8,
-    },
-    modalInput: {
-        borderWidth: 1,
-        borderColor: '#E5E7EB',
-        borderRadius: 8,
-        padding: 12,
-        marginBottom: 16,
-        fontSize: 16,
-        backgroundColor: '#F9FAFB',
-        textAlignVertical: 'top',
-    },
-    submitButton: {
-        backgroundColor: '#10B981',
-        borderRadius: 12,
-        paddingVertical: 12,
-        alignItems: 'center',
-        marginTop: 10,
-    },
-    submitButtonDisabled: {
-        opacity: 0.7,
-    },
-    submitButtonText: {
-        color: '#fff',
-        fontSize: 16,
-        fontWeight: 'bold',
-    },
-    billDocumentContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#F3F4F6',
-        borderRadius: 12,
-        padding: 12,
-        marginTop: 8,
-        borderWidth: 1,
-        borderColor: '#E5E7EB',
-    },
-    billThumbnail: {
-        width: 60,
-        height: 60,
-        borderRadius: 8,
-        backgroundColor: '#E5E7EB',
-    },
-    billInfo: {
-        flex: 1,
-        marginLeft: 12,
-    },
-    billText: {
-        fontSize: 16,
-        fontWeight: '500',
-        color: '#1F2937',
-    },
-    billSubtext: {
-        fontSize: 14,
-        color: '#6B7280',
-        marginTop: 2,
-    },
-    billDeleteButton: {
-        padding: 8,
-        borderRadius: 8,
-        backgroundColor: '#FEE2E2',
-    },
-    billViewButton: {
-        padding: 8,
-        borderRadius: 8,
-        backgroundColor: '#EBF5FF',
     },
 }); 

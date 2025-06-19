@@ -1,13 +1,15 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet, Alert, TextInput, FlatList, Modal, ScrollView, ActivityIndicator, Dimensions } from 'react-native';
 import { supabase } from '@/Config/supabaseConfig';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import { useRouter } from 'expo-router';
-import { decode as atob } from 'base-64';
+import { decode } from 'base64-arraybuffer';
 import { Ionicons, FontAwesome, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import TradeProposals from '@/app/components/TradeProposals';
+import LocationPicker from '@/app/components/LocationPicker';
+import LocationService from '@/app/services/locationService';
 
 const { width } = Dimensions.get('window');
 const GRID_SPACING = 2;
@@ -29,7 +31,6 @@ export default function Profile() {
   const [tradesCount, setTradesCount] = useState(0);
   const [rating, setRating] = useState(5.0);
   const [totalRatings, setTotalRatings] = useState(0);
-  const [verificationStatus, setVerificationStatus] = useState('unverified');
   const [joinDate, setJoinDate] = useState(null);
   const [lastActive, setLastActive] = useState(null);
   const [successfulTrades, setSuccessfulTrades] = useState(0);
@@ -38,6 +39,7 @@ export default function Profile() {
   const [favorites, setFavorites] = useState([]);
   const [favoriteItems, setFavoriteItems] = useState([]);
   const [tradeProposals, setTradeProposals] = useState([]);
+  const [userLocationData, setUserLocationData] = useState(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -64,7 +66,7 @@ export default function Profile() {
     try {
       const userId = await getCurrentUserId();
 
-      // Fetch user profile with a single query
+      // Fetch user profile with location data
       const { data: profile, error: profileError } = await supabase
         .from('users')
         .select(`
@@ -74,9 +76,15 @@ export default function Profile() {
           bio,
           phone_number,
           location,
+          latitude,
+          longitude,
+          address_street,
+          address_city,
+          address_region,
+          address_postal_code,
+          address_country,
           rating,
           total_ratings,
-          verification_status,
           join_date,
           last_active,
           successful_trades
@@ -106,10 +114,10 @@ export default function Profile() {
           setLocation('');
           setRating(5.0);
           setTotalRatings(0);
-          setVerificationStatus('unverified');
           setJoinDate(new Date().toISOString());
           setLastActive(new Date().toISOString());
           setSuccessfulTrades(0);
+          setUserLocationData(null);
           return;
         }
         throw profileError;
@@ -123,10 +131,25 @@ export default function Profile() {
       setLocation(profile.location || '');
       setRating(profile.rating || 5.0);
       setTotalRatings(profile.total_ratings || 0);
-      setVerificationStatus(profile.verification_status || 'unverified');
       setJoinDate(profile.join_date);
       setLastActive(profile.last_active);
       setSuccessfulTrades(profile.successful_trades || 0);
+
+      // Set location data if available
+      if (profile.latitude && profile.longitude) {
+        setUserLocationData({
+          latitude: profile.latitude,
+          longitude: profile.longitude,
+          address: {
+            street: profile.address_street || '',
+            city: profile.address_city || '',
+            region: profile.address_region || '',
+            postalCode: profile.address_postal_code || '',
+            country: profile.address_country || '',
+            fullAddress: profile.location || '',
+          },
+        });
+      }
     } catch (error) {
       console.error('Error fetching profile:', error);
       Alert.alert('Error', 'Failed to load profile. Please try again.');
@@ -334,6 +357,13 @@ export default function Profile() {
     }
   };
 
+  const handleLocationSelect = (locationData) => {
+    setUserLocationData(locationData);
+    if (locationData.address?.fullAddress) {
+      setLocation(locationData.address.fullAddress);
+    }
+  };
+
   const handleSave = async () => {
     try {
       setLoading(true);
@@ -364,17 +394,32 @@ export default function Profile() {
         }
       }
 
+      // Prepare update data
+      const updateData = {
+        name: name.trim(),
+        profile_image_url: profileImageUrl,
+        bio: bio.trim(),
+        phone_number: phoneNumber.trim(),
+        location: location.trim(),
+        updated_at: new Date().toISOString()
+      };
+
+      // Add location data if available
+      if (userLocationData && userLocationData.latitude && userLocationData.longitude) {
+        updateData.latitude = userLocationData.latitude;
+        updateData.longitude = userLocationData.longitude;
+        updateData.address_street = userLocationData.address.street;
+        updateData.address_city = userLocationData.address.city;
+        updateData.address_region = userLocationData.address.region;
+        updateData.address_postal_code = userLocationData.address.postalCode;
+        updateData.address_country = userLocationData.address.country;
+        updateData.location_updated_at = new Date().toISOString();
+      }
+
       // Update user profile
       const { error: updateError } = await supabase
         .from('users')
-        .update({
-          name: name.trim(),
-          profile_image_url: profileImageUrl,
-          bio: bio.trim(),
-          phone_number: phoneNumber.trim(),
-          location: location.trim(),
-          updated_at: new Date().toISOString()
-        })
+        .update(updateData)
         .eq('id', userId);
 
       if (updateError) {
@@ -543,18 +588,6 @@ export default function Profile() {
             </TouchableOpacity>
           </View>
           <Text style={styles.name}>{name || 'No name set'}</Text>
-          
-          {/* Verification Badge */}
-          <View style={styles.verificationBadge}>
-            <MaterialCommunityIcons 
-              name={verificationStatus === 'verified' ? 'check-decagram' : 'shield-outline'} 
-              size={20} 
-              color={verificationStatus === 'verified' ? '#4CAF50' : '#FFA500'} 
-            />
-            <Text style={styles.verificationText}>
-              {verificationStatus === 'verified' ? 'Verified User' : 'Unverified'}
-            </Text>
-          </View>
         </View>
 
         {/* Stats Row */}
@@ -580,27 +613,27 @@ export default function Profile() {
       <View style={styles.infoSection}>
         {location && (
           <View style={styles.infoCard}>
-            <MaterialCommunityIcons name="map-marker-outline" size={20} color="#833AB4" />
+            <MaterialCommunityIcons name="map-marker-outline" size={20} color="#075eec" />
             <Text style={styles.infoText}>{location}</Text>
           </View>
         )}
         
         {phoneNumber && (
           <View style={styles.infoCard}>
-            <MaterialCommunityIcons name="phone-outline" size={20} color="#833AB4" />
+            <MaterialCommunityIcons name="phone-outline" size={20} color="#075eec" />
             <Text style={styles.infoText}>{phoneNumber}</Text>
           </View>
         )}
 
         {bio && (
           <View style={styles.infoCard}>
-            <MaterialCommunityIcons name="text-box-outline" size={20} color="#833AB4" />
+            <MaterialCommunityIcons name="text-box-outline" size={20} color="#075eec" />
             <Text style={styles.infoText}>{bio}</Text>
           </View>
         )}
 
         <View style={styles.infoCard}>
-          <MaterialCommunityIcons name="clock-outline" size={20} color="#833AB4" />
+          <MaterialCommunityIcons name="clock-outline" size={20} color="#075eec" />
           <Text style={styles.infoText}>
             Joined {joinDate ? new Date(joinDate).toLocaleDateString() : 'Recently'}
           </Text>
@@ -715,12 +748,14 @@ export default function Profile() {
                 placeholder="Phone Number"
                 keyboardType="phone-pad"
               />
-              <TextInput
-                style={styles.input}
-                value={location}
-                onChangeText={setLocation}
-                placeholder="Location"
+              
+              {/* Location Picker Component */}
+              <LocationPicker
+                onLocationSelect={handleLocationSelect}
+                initialLocation={userLocationData}
+                placeholder="Enter your address..."
               />
+              
               <TextInput
                 style={styles.input}
                 value={bio}
@@ -823,48 +858,11 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 120,
     right: 24,
-    backgroundColor: '#FFA500',
+    backgroundColor: '#075eec',
     borderRadius: 30,
     padding: 14,
     elevation: 5,
     zIndex: 10,
-  },
-  verificationBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    marginTop: 8,
-  },
-  verificationText: {
-    marginLeft: 6,
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1F2937',
-  },
-  infoSection: {
-    padding: 16,
-  },
-  infoCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 10,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  infoText: {
-    marginLeft: 12,
-    fontSize: 15,
-    color: '#1F2937',
-    flex: 1,
   },
   sectionTitle: {
     fontSize: 18,
@@ -965,7 +963,7 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   modalButton: {
-    backgroundColor: '#833AB4',
+    backgroundColor: '#075eec',
     padding: 12,
     borderRadius: 8,
     minWidth: 90,
@@ -992,32 +990,25 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     marginTop: 20,
   },
-  subsectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#4B5563',
-    marginBottom: 12,
-  },
-  proposalsContainer: {
-    marginBottom: 24,
-  },
-  proposalCard: {
-    backgroundColor: '#F9FAFB',
-    borderRadius: 12,
+  infoSection: {
     padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
   },
-  proposalHeader: {
+  infoCard: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
-  proposalTitle: {
-    fontSize: 16,
-    fontWeight: '600',
+  infoText: {
+    marginLeft: 12,
+    fontSize: 15,
     color: '#1F2937',
     flex: 1,
   },

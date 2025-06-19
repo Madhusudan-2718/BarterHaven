@@ -1,160 +1,252 @@
-import { View, Text, StyleSheet, TouchableOpacity, Switch, Alert, Modal, TextInput } from 'react-native';
 import React, { useState } from 'react';
-import { useColorScheme } from 'react-native';
+import {
+    View,
+    Text,
+    StyleSheet,
+    TouchableOpacity,
+    Switch,
+    ScrollView,
+    Alert,
+    Animated,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/Config/supabaseConfig';
 
-export default function Settings() {
-  const colorScheme = useColorScheme();
-  const [isDark, setIsDark] = useState(colorScheme === 'dark');
-  const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [newPassword, setNewPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const router = useRouter();
+export default function SettingsScreen() {
+    const router = useRouter();
+    const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+    const [locationEnabled, setLocationEnabled] = useState(true);
 
-  const handleChangePassword = async () => {
-    if (!newPassword || newPassword.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters');
-      return;
-    }
-    setLoading(true);
-    const { error } = await supabase.auth.updateUser({ password: newPassword });
-    setLoading(false);
-    if (error) {
-      Alert.alert('Error', error.message);
-    } else {
-      setShowPasswordModal(false);
-      setNewPassword('');
-      Alert.alert('Success', 'Password updated successfully');
-    }
-  };
+    const handleLogout = () => {
+        Alert.alert(
+            "Logout",
+            "Are you sure you want to logout?",
+            [
+                {
+                    text: "Cancel",
+                    style: "cancel"
+                },
+                {
+                    text: "Logout",
+                    style: 'destructive',
+                    onPress: async () => {
+                        await supabase.auth.signOut();
+                        router.replace('/auth/signIn');
+                    }
+                }
+            ]
+        );
+    };
 
-  return (
-    <View style={styles.container}>
-      <Text style={styles.header}>Settings</Text>
+    const handleEditProfile = () => {
+        // Navigate to the profile tab
+        router.push('/(drawer)/(tabs)/profile');
+    };
 
-      <TouchableOpacity style={styles.item} onPress={() => router.push('/(drawer)/(tabs)/profile')}>
-        <Text style={styles.itemText}>Edit Profile</Text>
-      </TouchableOpacity>
+    const SettingItem = React.memo(({ icon, title, description, value, onValueChange, type = 'toggle' }) => {
+        const scaleAnim = React.useRef(new Animated.Value(1)).current;
 
-      <TouchableOpacity style={styles.item} onPress={() => setShowPasswordModal(true)}>
-        <Text style={styles.itemText}>Change Password</Text>
-      </TouchableOpacity>
+        const onPressIn = () => {
+            Animated.spring(scaleAnim, {
+                toValue: 0.98,
+                friction: 5,
+                tension: 40,
+                useNativeDriver: true
+            }).start();
+        };
 
-      <TouchableOpacity style={styles.item} onPress={() => Alert.alert('Terms of Service', 'Show your Terms of Service here.')}>
-        <Text style={styles.itemText}>Terms of Service</Text>
-      </TouchableOpacity>
+        const onPressOut = () => {
+            Animated.spring(scaleAnim, {
+                toValue: 1,
+                friction: 5,
+                tension: 40,
+                useNativeDriver: true
+            }).start();
+        };
 
-      <TouchableOpacity style={styles.item} onPress={() => Alert.alert('Privacy Policy', 'Show your Privacy Policy here.')}>
-        <Text style={styles.itemText}>Privacy Policy</Text>
-      </TouchableOpacity>
+        return (
+            <TouchableOpacity
+                activeOpacity={1}
+                onPressIn={onPressIn}
+                onPressOut={onPressOut}
+                onPress={() => type === 'button' && onValueChange?.()}
+            >
+                <Animated.View style={[
+                    styles.settingItem,
+                    { transform: [{ scale: scaleAnim }] }
+                ]}>
+                    <View style={styles.settingIcon}>
+                        <Ionicons name={icon} size={24} color="#075eec" />
+                    </View>
+                    <View style={styles.settingContent}>
+                        <Text style={styles.settingTitle}>{title}</Text>
+                        {description && (
+                            <Text style={styles.settingDescription}>{description}</Text>
+                        )}
+                    </View>
+                    {type === 'toggle' && (
+                        <Switch
+                            value={value}
+                            onValueChange={onValueChange}
+                            trackColor={{ false: '#E5E7EB', true: '#075eec' }}
+                            thumbColor="#fff"
+                        />
+                    )}
+                    {type === 'button' && (
+                        <Ionicons name="chevron-forward" size={24} color="#9CA3AF" />
+                    )}
+                </Animated.View>
+            </TouchableOpacity>
+        );
+    });
 
-      {/* Change Password Modal */}
-      <Modal visible={showPasswordModal} transparent animationType="slide" onRequestClose={() => setShowPasswordModal(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Change Password</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="New Password"
-              secureTextEntry
-              value={newPassword}
-              onChangeText={setNewPassword}
-            />
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <TouchableOpacity style={styles.modalButton} onPress={handleChangePassword} disabled={loading}>
-                <Text style={styles.modalButtonText}>{loading ? 'Updating...' : 'Update'}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.modalButton, { backgroundColor: '#ccc' }]} onPress={() => setShowPasswordModal(false)}>
-                <Text style={[styles.modalButtonText, { color: '#333' }]}>Cancel</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+    return (
+        <View style={styles.container}>
+            <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Preferences</Text>
+                    <SettingItem
+                        icon="notifications-outline"
+                        title="Push Notifications"
+                        description="Receive notifications about trades and messages"
+                        value={notificationsEnabled}
+                        onValueChange={setNotificationsEnabled}
+                    />
+                    <SettingItem
+                        icon="location-outline"
+                        title="Location Services"
+                        description="Enable location-based item discovery"
+                        value={locationEnabled}
+                        onValueChange={setLocationEnabled}
+                    />
+                </View>
+
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Account</Text>
+                    <SettingItem
+                        icon="person-outline"
+                        title="Edit Profile"
+                        description="Update your personal information"
+                        type="button"
+                        onValueChange={handleEditProfile}
+                    />
+                </View>
+
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Support</Text>
+                    <SettingItem
+                        icon="help-circle-outline"
+                        title="Help Center"
+                        description="Get help and contact support"
+                        type="button"
+                        onValueChange={() => Alert.alert('Help Center', 'Contact support at support@barterhaven.com')}
+                    />
+                    <SettingItem
+                        icon="document-text-outline"
+                        title="Terms of Service"
+                        description="Read our terms and conditions"
+                        type="button"
+                        onValueChange={() => Alert.alert('Terms of Service', 'View our terms and conditions.')}
+                    />
+                    <SettingItem
+                        icon="shield-outline"
+                        title="Privacy Policy"
+                        description="View our privacy policy"
+                        type="button"
+                        onValueChange={() => Alert.alert('Privacy Policy', 'View our privacy policy.')}
+                    />
+                </View>
+
+                <TouchableOpacity
+                    style={styles.logoutButton}
+                    onPress={handleLogout}
+                >
+                    <Ionicons name="log-out-outline" size={24} color="#FF3B30" />
+                    <Text style={styles.logoutText}>Logout</Text>
+                </TouchableOpacity>
+            </ScrollView>
         </View>
-      </Modal>
-    </View>
-  );
+    );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F3F4F6',
-    padding: 20,
-  },
-  header: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1F2937',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  item: {
-    backgroundColor: '#fff',
-    padding: 16,
-    borderRadius: 10,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  itemRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#fff',
-    padding: 16,
-    borderRadius: 10,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  itemText: {
-    fontSize: 16,
-    color: '#1F2937',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 24,
-    width: '85%',
-    maxWidth: 400,
-    alignItems: 'center',
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 16,
-    color: '#1F2937',
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 16,
-    width: '100%',
-    fontSize: 16,
-    backgroundColor: '#F3F4F6',
-    color: '#1F2937',
-  },
-  modalButton: {
-    backgroundColor: '#3B82F6',
-    padding: 12,
-    borderRadius: 8,
-    marginHorizontal: 5,
-    marginTop: 8,
-    minWidth: 90,
-    alignItems: 'center',
-  },
-  modalButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
+    container: {
+        flex: 1,
+        backgroundColor: '#F3F4F6',
+    },
+    content: {
+        flex: 1,
+        paddingTop: 16,
+    },
+    section: {
+        marginTop: 24,
+        marginHorizontal: 16,
+    },
+    sectionTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#075eec',
+        marginBottom: 16,
+        fontFamily: 'outfit-bold',
+    },
+    settingItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#fff',
+        borderRadius: 16,
+        padding: 16,
+        marginBottom: 12,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    settingIcon: {
+        width: 40,
+        height: 40,
+        borderRadius: 12,
+        backgroundColor: '#EBF5FF',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 16,
+    },
+    settingContent: {
+        flex: 1,
+    },
+    settingTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#1F2937',
+        marginBottom: 4,
+        fontFamily: 'outfit-bold',
+    },
+    settingDescription: {
+        fontSize: 14,
+        color: '#6B7280',
+        fontFamily: 'outfit',
+    },
+    logoutButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#FFF1F0',
+        marginHorizontal: 16,
+        marginVertical: 24,
+        padding: 16,
+        borderRadius: 16,
+        shadowColor: '#FF3B30',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    logoutText: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#FF3B30',
+        marginLeft: 8,
+        fontFamily: 'outfit-bold',
+    },
 });

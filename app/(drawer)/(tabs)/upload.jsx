@@ -20,6 +20,7 @@ import { router } from 'expo-router';
 import { decode as atob } from 'base-64';
 import { categories as categoryList } from '@/Config/categories';
 import { LinearGradient } from 'expo-linear-gradient';
+import LocationPicker from '@/app/components/LocationPicker';
 
 const { width } = Dimensions.get('window');
 const categories = categoryList.map(cat => cat.name);
@@ -40,6 +41,8 @@ export default function UploadScreen({ navigation }) {
     const [currentStep, setCurrentStep] = useState(1);
     const [billDocument, setBillDocument] = useState(null);
     const [billDocumentName, setBillDocumentName] = useState('');
+    const [billUploading, setBillUploading] = useState(false);
+    const [itemLocation, setItemLocation] = useState(null);
 
     const takePhoto = async () => {
         try {
@@ -101,10 +104,10 @@ export default function UploadScreen({ navigation }) {
         );
     };
 
-    const uploadImage = async (uri) => {
+    const uploadImage = async (uri, isDocument = false) => {
         try {
             if (!uri.startsWith('file://')) {
-                throw new Error('Invalid image URI format');
+                throw new Error('Invalid file URI format');
             }
 
             // Read file as base64
@@ -118,21 +121,52 @@ export default function UploadScreen({ navigation }) {
                 bytes[i] = binaryString.charCodeAt(i);
             }
 
-            // Generate unique filename
-            const fileExt = uri.split('.').pop().toLowerCase();
-            const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-            const filePath = `items/${fileName}`;
+            // Generate unique filename with proper extension detection
+            const fileName = uri.split('/').pop() || 'file';
+            const fileExt = fileName.includes('.') ? fileName.split('.').pop().toLowerCase() : 'jpg';
+            const uniqueFileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+            const filePath = isDocument ? `documents/${uniqueFileName}` : `items/${uniqueFileName}`;
+
+            // Determine content type
+            let contentType;
+            if (isDocument) {
+                switch (fileExt) {
+                    case 'pdf':
+                        contentType = 'application/pdf';
+                        break;
+                    case 'doc':
+                        contentType = 'application/msword';
+                        break;
+                    case 'docx':
+                        contentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+                        break;
+                    case 'jpg':
+                    case 'jpeg':
+                        contentType = 'image/jpeg';
+                        break;
+                    case 'png':
+                        contentType = 'image/png';
+                        break;
+                    default:
+                        contentType = 'image/jpeg'; // Default for photos
+                }
+            } else {
+                contentType = `image/${fileExt}`;
+            }
 
             // Upload to Supabase
             const { error, data } = await supabase.storage
                 .from('items')
                 .upload(filePath, bytes, {
-                    contentType: `image/${fileExt}`,
+                    contentType,
                     cacheControl: '3600',
                     upsert: false,
                 });
 
-            if (error) throw error;
+            if (error) {
+                console.error('Upload error:', error);
+                throw error;
+            }
             if (!data) throw new Error('No data returned from upload');
 
             // Get public URL
@@ -144,7 +178,42 @@ export default function UploadScreen({ navigation }) {
 
             return publicUrl;
         } catch (error) {
-            throw new Error(`Image upload failed: ${error.message}`);
+            console.error('Upload failed:', error);
+            throw new Error(`${isDocument ? 'Document' : 'Image'} upload failed: ${error.message}`);
+        }
+    };
+
+    const validateBillDocument = async (uri) => {
+        try {
+            const fileInfo = await FileSystem.getInfoAsync(uri);
+            
+            // Check file size (10MB limit)
+            if (fileInfo.size > 10 * 1024 * 1024) {
+                Alert.alert('Error', 'Document size should be less than 10MB');
+                return false;
+            }
+            
+            // Check if file exists
+            if (!fileInfo.exists) {
+                Alert.alert('Error', 'Selected file does not exist');
+                return false;
+            }
+            
+            // Check file extension
+            const fileName = uri.split('/').pop() || '';
+            const fileExt = fileName.includes('.') ? fileName.split('.').pop().toLowerCase() : '';
+            const allowedExtensions = ['jpg', 'jpeg', 'png', 'pdf', 'doc', 'docx'];
+            
+            if (!allowedExtensions.includes(fileExt)) {
+                Alert.alert('Error', 'Please select a valid document type (JPG, PNG, PDF, DOC, DOCX)');
+                return false;
+            }
+            
+            return true;
+        } catch (error) {
+            console.error('Document validation error:', error);
+            Alert.alert('Error', 'Failed to validate document. Please try again.');
+            return false;
         }
     };
 
@@ -159,20 +228,23 @@ export default function UploadScreen({ navigation }) {
             const result = await ImagePicker.launchCameraAsync({
                 allowsEditing: true,
                 quality: 1,
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
             });
 
-            if (!result.canceled) {
-                const fileInfo = await FileSystem.getInfoAsync(result.assets[0].uri);
-                if (fileInfo.size > 10 * 1024 * 1024) { // 10MB limit
-                    Alert.alert('Error', 'Document size should be less than 10MB');
-                    return;
-                }
-                setBillDocument(result.assets[0].uri);
-                setBillDocumentName(result.assets[0].uri.split('/').pop());
+            if (!result.canceled && result.assets && result.assets.length > 0) {
+                const asset = result.assets[0];
+                
+                // Validate the document
+                const isValid = await validateBillDocument(asset.uri);
+                if (!isValid) return;
+                
+                setBillDocument(asset.uri);
+                setBillDocumentName(asset.uri.split('/').pop() || 'bill_photo.jpg');
+                console.log('Bill photo selected:', asset.uri);
             }
         } catch (error) {
             console.error('Camera error:', error);
-            Alert.alert('Error', 'Failed to take photo');
+            Alert.alert('Error', 'Failed to take photo. Please try again.');
         }
     };
 
@@ -184,18 +256,20 @@ export default function UploadScreen({ navigation }) {
                 quality: 1,
             });
 
-            if (!result.canceled) {
-                const fileInfo = await FileSystem.getInfoAsync(result.assets[0].uri);
-                if (fileInfo.size > 10 * 1024 * 1024) { // 10MB limit
-                    Alert.alert('Error', 'Document size should be less than 10MB');
-                    return;
-                }
-                setBillDocument(result.assets[0].uri);
-                setBillDocumentName(result.assets[0].uri.split('/').pop());
+            if (!result.canceled && result.assets && result.assets.length > 0) {
+                const asset = result.assets[0];
+                
+                // Validate the document
+                const isValid = await validateBillDocument(asset.uri);
+                if (!isValid) return;
+                
+                setBillDocument(asset.uri);
+                setBillDocumentName(asset.uri.split('/').pop() || 'bill_document.jpg');
+                console.log('Bill document selected:', asset.uri);
             }
         } catch (error) {
             console.error('Gallery picker error:', error);
-            Alert.alert('Error', 'Failed to pick image');
+            Alert.alert('Error', 'Failed to pick image. Please try again.');
         }
     };
 
@@ -220,6 +294,10 @@ export default function UploadScreen({ navigation }) {
         );
     };
 
+    const handleLocationSelect = (locationData) => {
+        setItemLocation(locationData);
+    };
+
     const handleUpload = async () => {
         if (!title || !description || !image || !category) {
             Alert.alert('Error', 'Please fill in all fields and select an image');
@@ -239,11 +317,34 @@ export default function UploadScreen({ navigation }) {
             // Upload bill document if provided
             let billUrl = null;
             if (billDocument) {
-                console.log('Starting bill document upload...');
-                billUrl = await uploadImage(billDocument);
-                console.log('Bill document uploaded successfully:', billUrl);
+                try {
+                    setBillUploading(true);
+                    console.log('Starting bill document upload...');
+                    setUploadProgress(35);
+                    billUrl = await uploadImage(billDocument, true);
+                    console.log('Bill document uploaded successfully:', billUrl);
+                    setUploadProgress(60);
+                } catch (error) {
+                    console.error('Bill document upload failed:', error);
+                    Alert.alert(
+                        'Bill Upload Failed',
+                        'The bill document failed to upload, but your item will still be uploaded. You can add the bill later.',
+                        [
+                            { text: 'Continue without bill', onPress: () => {} },
+                            { text: 'Cancel upload', onPress: () => {
+                                setLoading(false);
+                                setUploadProgress(0);
+                                setBillUploading(false);
+                                return;
+                            }}
+                        ]
+                    );
+                    // Continue without bill document
+                    billUrl = null;
+                } finally {
+                    setBillUploading(false);
+                }
             }
-            setUploadProgress(60);
 
             // Get current user
             const { data: { user } } = await supabase.auth.getUser();
@@ -267,24 +368,37 @@ export default function UploadScreen({ navigation }) {
                 if (insertError) throw insertError;
             }
 
+            // Prepare item data
+            const itemData = {
+                title,
+                description,
+                image_url: imageUrl,
+                user_id: user.id,
+                created_at: new Date().toISOString(),
+                status: 'available',
+                category: category,
+                offering,
+                exchangefor,
+                bartertype,
+            };
+
+            // Add location data if available
+            if (itemLocation && itemLocation.latitude && itemLocation.longitude) {
+                itemData.latitude = itemLocation.latitude;
+                itemData.longitude = itemLocation.longitude;
+                itemData.address_street = itemLocation.address.street;
+                itemData.address_city = itemLocation.address.city;
+                itemData.address_region = itemLocation.address.region;
+                itemData.address_postal_code = itemLocation.address.postalCode;
+                itemData.address_country = itemLocation.address.country;
+                itemData.location_updated_at = new Date().toISOString();
+            }
+
             // Save item data to Supabase
             console.log('Saving item data...');
-            const { data: itemData, error: itemError } = await supabase
+            const { data: savedItem, error: itemError } = await supabase
                 .from('items')
-                .insert([
-                    {
-                        title,
-                        description,
-                        image_url: imageUrl,
-                        user_id: user.id,
-                        created_at: new Date().toISOString(),
-                        status: 'available',
-                        category: category,
-                        offering,
-                        exchangefor,
-                        bartertype,
-                    },
-                ])
+                .insert([itemData])
                 .select()
                 .single();
 
@@ -292,17 +406,31 @@ export default function UploadScreen({ navigation }) {
 
             // Save bill document if provided
             if (billUrl) {
-                const { error: billError } = await supabase
-                    .from('bill_documents')
-                    .insert([
-                        {
-                            item_id: itemData.id,
-                            document_url: billUrl,
-                            document_type: billDocument.split('.').pop().toLowerCase(),
-                        },
-                    ]);
+                try {
+                    const fileName = billDocument.split('/').pop() || 'document';
+                    const fileExt = fileName.includes('.') ? fileName.split('.').pop().toLowerCase() : 'jpg';
+                    
+                    const { error: billError } = await supabase
+                        .from('bill_documents')
+                        .insert([
+                            {
+                                item_id: savedItem.id,
+                                document_url: billUrl,
+                                document_type: fileExt,
+                            },
+                        ]);
 
-                if (billError) throw billError;
+                    if (billError) {
+                        console.error('Bill document database error:', billError);
+                        // Don't throw error here, just log it
+                        // The document is uploaded but not linked in database
+                    } else {
+                        console.log('Bill document saved to database successfully');
+                    }
+                } catch (error) {
+                    console.error('Bill document database insertion error:', error);
+                    // Continue without saving bill document to database
+                }
             }
 
             setUploadProgress(100);
@@ -318,6 +446,7 @@ export default function UploadScreen({ navigation }) {
             setBartertype('Online Barter');
             setBillDocument(null);
             setBillDocumentName('');
+            setItemLocation(null);
             setLoading(false);
             setUploadProgress(0);
 
@@ -387,7 +516,9 @@ export default function UploadScreen({ navigation }) {
             case 4:
                 return offering.trim() !== '' && exchangefor.trim() !== '';
             case 5:
-                return billDocument !== null;
+                return true; // Location is optional
+            case 6:
+                return true; // Bill document is optional
             default:
                 return false;
         }
@@ -424,7 +555,7 @@ export default function UploadScreen({ navigation }) {
 
     const renderStepIndicator = () => (
         <View style={styles.stepIndicatorContainer}>
-            {[1, 2, 3, 4, 5].map((step) => (
+            {[1, 2, 3, 4, 5, 6].map((step, index) => (
                 <View key={step} style={styles.stepRow}>
                     <View style={[
                         styles.stepCircle,
@@ -432,7 +563,7 @@ export default function UploadScreen({ navigation }) {
                         currentStep > step && styles.completedStepCircle
                     ]}>
                         {currentStep > step ? (
-                            <Feather name="check" size={16} color="#fff" />
+                            <Feather name="check" size={12} color="#fff" />
                         ) : (
                             <Text style={[
                                 styles.stepNumber,
@@ -440,7 +571,7 @@ export default function UploadScreen({ navigation }) {
                             ]}>{step}</Text>
                         )}
                     </View>
-                    {step < 5 && <View style={[
+                    {index < 5 && <View style={[
                         styles.stepLine,
                         currentStep > step && styles.completedStepLine
                     ]} />}
@@ -572,11 +703,27 @@ export default function UploadScreen({ navigation }) {
             case 5:
                 return (
                     <View style={styles.stepContent}>
+                        <Text style={styles.stepTitle}>Item Location (Optional)</Text>
+                        <Text style={styles.stepDescription}>Set the location where this item is available for pickup or exchange</Text>
+                        <LocationPicker
+                            onLocationSelect={handleLocationSelect}
+                            initialLocation={itemLocation}
+                            placeholder="Enter item location..."
+                        />
+                        <Text style={styles.optionalNote}>
+                            * Location helps other users find items near them. You can skip this step if you prefer.
+                        </Text>
+                    </View>
+                );
+            case 6:
+                return (
+                    <View style={styles.stepContent}>
                         <Text style={styles.stepTitle}>Add Bill Document (Optional)</Text>
                         <Text style={styles.stepDescription}>Upload a bill or receipt related to your item for fair barter</Text>
                         <TouchableOpacity 
                             style={styles.documentUploadSection} 
                             onPress={showBillDocumentOptions}
+                            disabled={billUploading}
                         >
                             {billDocument ? (
                                 <View style={styles.selectedDocument}>
@@ -584,15 +731,19 @@ export default function UploadScreen({ navigation }) {
                                     <Text style={styles.documentName} numberOfLines={1}>
                                         {billDocumentName}
                                     </Text>
-                                    <TouchableOpacity 
-                                        style={styles.removeDocument}
-                                        onPress={() => {
-                                            setBillDocument(null);
-                                            setBillDocumentName('');
-                                        }}
-                                    >
-                                        <Feather name="x" size={20} color="#666" />
-                                    </TouchableOpacity>
+                                    {billUploading ? (
+                                        <ActivityIndicator size="small" color="#3B82F6" />
+                                    ) : (
+                                        <TouchableOpacity 
+                                            style={styles.removeDocument}
+                                            onPress={() => {
+                                                setBillDocument(null);
+                                                setBillDocumentName('');
+                                            }}
+                                        >
+                                            <Feather name="x" size={20} color="#666" />
+                                        </TouchableOpacity>
+                                    )}
                                 </View>
                             ) : (
                                 <View style={styles.documentPlaceholder}>
@@ -602,7 +753,9 @@ export default function UploadScreen({ navigation }) {
                                     >
                                         <MaterialCommunityIcons name="file-upload" size={32} color="#fff" />
                                     </LinearGradient>
-                                    <Text style={styles.uploadText}>Tap to upload document</Text>
+                                    <Text style={styles.uploadText}>
+                                        {billUploading ? 'Uploading document...' : 'Tap to upload document'}
+                                    </Text>
                                     <Text style={styles.uploadSubtext}>Take a photo or choose from gallery (max 10MB)</Text>
                                 </View>
                             )}
@@ -628,56 +781,49 @@ export default function UploadScreen({ navigation }) {
 
             <View style={styles.content}>
                 {renderStepContent()}
+            </View>
 
-                <View style={styles.navigationButtons}>
-                    {currentStep > 1 && (
-                        <TouchableOpacity
-                            style={styles.backButton}
-                            onPress={handlePreviousStep}
-                        >
-                            <Feather name="arrow-left" size={20} color="#666" />
-                            <Text style={styles.backButtonText}>Back</Text>
-                        </TouchableOpacity>
-                    )}
-                    {currentStep < 5 ? (
-                        <TouchableOpacity
-                            style={[
-                                styles.nextButton,
-                                !canProceedToNextStep() && styles.nextButtonDisabled
-                            ]}
-                            onPress={handleNextStep}
-                            disabled={!canProceedToNextStep()}
-                        >
-                            <Text style={styles.nextButtonText}>Next</Text>
-                            <Feather name="arrow-right" size={20} color="#fff" />
-                        </TouchableOpacity>
-                    ) : (
-                        <TouchableOpacity
-                            style={[
-                                styles.uploadButton,
-                                !canProceedToNextStep() && styles.uploadButtonDisabled
-                            ]}
-                            onPress={handleUpload}
-                            disabled={!canProceedToNextStep() || loading}
-                        >
-                            <LinearGradient
-                                colors={['#3B82F6', '#2563EB']}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 1 }}
-                                style={styles.uploadButtonGradient}
-                            >
-                                {loading ? (
-                                    <ActivityIndicator color="#fff" />
-                                ) : (
-                                    <View style={styles.uploadButtonContent}>
-                                        <Feather name="upload-cloud" size={20} color="#fff" style={{ marginRight: 8 }} />
-                                        <Text style={styles.uploadButtonText}>Upload Item</Text>
-                                    </View>
-                                )}
-                            </LinearGradient>
-                        </TouchableOpacity>
-                    )}
-                </View>
+            <View style={styles.navigationButtons}>
+                {currentStep > 1 && (
+                    <TouchableOpacity
+                        style={styles.backButton}
+                        onPress={handlePreviousStep}
+                    >
+                        <Feather name="arrow-left" size={20} color="#666" />
+                        <Text style={styles.backButtonText}>Back</Text>
+                    </TouchableOpacity>
+                )}
+                {currentStep < 6 ? (
+                    <TouchableOpacity
+                        style={[
+                            styles.nextButton,
+                            !canProceedToNextStep() && styles.nextButtonDisabled
+                        ]}
+                        onPress={handleNextStep}
+                        disabled={!canProceedToNextStep()}
+                    >
+                        <Text style={styles.nextButtonText}>Next</Text>
+                        <Feather name="arrow-right" size={20} color="#fff" />
+                    </TouchableOpacity>
+                ) : (
+                    <TouchableOpacity
+                        style={[
+                            styles.uploadButton,
+                            !canProceedToNextStep() && styles.uploadButtonDisabled
+                        ]}
+                        onPress={handleUpload}
+                        disabled={!canProceedToNextStep() || loading}
+                    >
+                        {loading ? (
+                            <ActivityIndicator size="small" color="#fff" />
+                        ) : (
+                            <>
+                                <Text style={styles.uploadButtonText}>Upload Item</Text>
+                                <Feather name="upload-cloud" size={24} color="#fff" />
+                            </>
+                        )}
+                    </TouchableOpacity>
+                )}
             </View>
 
             <Modal
@@ -747,18 +893,20 @@ const styles = StyleSheet.create({
     },
     stepIndicatorContainer: {
         flexDirection: 'row',
-        justifyContent: 'center',
+        justifyContent: 'space-between',
         alignItems: 'center',
-        paddingHorizontal: 20,
+        paddingHorizontal: 5,
+        marginBottom: 20,
     },
     stepRow: {
         flexDirection: 'row',
         alignItems: 'center',
+        flex: 1,
     },
     stepCircle: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
+        width: 24,
+        height: 24,
+        borderRadius: 12,
         backgroundColor: '#fff',
         justifyContent: 'center',
         alignItems: 'center',
@@ -775,23 +923,25 @@ const styles = StyleSheet.create({
     },
     stepNumber: {
         color: '#666',
-        fontSize: 14,
+        fontSize: 10,
         fontWeight: 'bold',
     },
     activeStepNumber: {
         color: '#fff',
     },
     stepLine: {
-        width: 40,
+        flex: 1,
         height: 2,
         backgroundColor: '#E5E7EB',
-        marginHorizontal: 4,
+        marginHorizontal: 1,
     },
     completedStepLine: {
         backgroundColor: '#10B981',
     },
     content: {
+        flex: 1,
         padding: 20,
+        paddingBottom: 100, // Add padding to account for fixed navigation
     },
     stepContent: {
         marginBottom: 20,
@@ -828,22 +978,23 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     uploadIconContainer: {
-        width: 64,
-        height: 64,
-        borderRadius: 32,
+        width: 60,
+        height: 60,
+        borderRadius: 30,
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 12,
     },
     uploadText: {
-        fontSize: 18,
+        fontSize: 16,
         fontWeight: '600',
-        color: '#3B82F6',
+        color: '#1F2937',
         marginBottom: 4,
     },
     uploadSubtext: {
-        fontSize: 14,
+        fontSize: 12,
         color: '#6B7280',
+        textAlign: 'center',
     },
     formGroup: {
         marginBottom: 20,
@@ -911,6 +1062,11 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         marginTop: 20,
+        paddingHorizontal: 20,
+        paddingBottom: 20,
+        backgroundColor: '#fff',
+        borderTopWidth: 1,
+        borderTopColor: '#E5E7EB',
     },
     backButton: {
         flexDirection: 'row',
@@ -940,25 +1096,23 @@ const styles = StyleSheet.create({
         marginRight: 8,
     },
     uploadButton: {
-        borderRadius: 12,
-        overflow: 'hidden',
-    },
-    uploadButtonDisabled: {
-        opacity: 0.5,
-    },
-    uploadButtonGradient: {
-        paddingVertical: 16,
-        paddingHorizontal: 32,
-    },
-    uploadButtonContent: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
+        backgroundColor: '#3B82F6',
+        paddingVertical: 16,
+        paddingHorizontal: 32,
+        borderRadius: 12,
+        width: '100%',
+    },
+    uploadButtonDisabled: {
+        backgroundColor: '#93C5FD',
     },
     uploadButtonText: {
         color: '#fff',
-        fontSize: 16,
+        fontSize: 18,
         fontWeight: '600',
+        marginRight: 12,
     },
     modalOverlay: {
         flex: 1,
@@ -1055,6 +1209,7 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
+        padding: 20,
     },
     selectedDocument: {
         flex: 1,
@@ -1071,5 +1226,10 @@ const styles = StyleSheet.create({
     },
     removeDocument: {
         padding: 8,
+    },
+    optionalNote: {
+        fontSize: 12,
+        color: '#6B7280',
+        marginTop: 8,
     },
 }); 

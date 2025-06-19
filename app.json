@@ -9,7 +9,14 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "BarterHaven uses your location to help you find nearby items and users for better trading opportunities.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "BarterHaven uses your location to help you find nearby items and users for better trading opportunities."
+      },
+      "config": {
+        "googleMapsApiKey": "AIzaSyDhf1yN_glc__tAXAYU6g9_XhQT3Hd72qk"
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -19,9 +26,16 @@
       "permissions": [
         "android.permission.RECORD_AUDIO",
         "android.permission.CAMERA",
-        "android.permission.READ_EXTERNAL_STORAGE"
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION"
       ],
-      "package": "com.madhuachar.BH"
+      "package": "com.madhuachar.BH",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyDhf1yN_glc__tAXAYU6g9_XhQT3Hd72qk"
+        }
+      }
     },
     "web": {
       "bundler": "metro",
@@ -45,7 +59,17 @@
           "photosPermission": "The app accesses your photos to let you share them with your friends."
         }
       ],
-      "expo-secure-store"
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow BarterHaven to use your location to help you find nearby items and users.",
+          "locationAlwaysPermission": "Allow BarterHaven to use your location in the background to provide location-based features.",
+          "isIosBackgroundLocationEnabled": false,
+          "isAndroidBackgroundLocationEnabled": false
+        }
+      ],
+      "expo-secure-store",
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true

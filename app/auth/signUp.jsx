@@ -23,7 +23,7 @@ export default function SignUp() {
     if (error) {
       Alert.alert('Sign Up Failed', error.message);
     } else {
-      Alert.alert('Success', 'Account created! Please check your email to verify.');
+      Alert.alert('Success', 'Account created successfully!');
       router.replace('/auth/signIn');
     }
   };
