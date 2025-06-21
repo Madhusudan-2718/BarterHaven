@@ -3,6 +3,7 @@ import { useFonts } from "expo-font";
 import { UserDetailContext } from "@/context/UserDetailContext";
 import { useState } from "react";
 import { AuthProvider } from '@/Config/AuthContext';
+import { NotificationProvider } from '@/context/NotificationContext';
 
 
 export default function RootLayout() {
@@ -16,23 +17,25 @@ export default function RootLayout() {
 
   return (
     <AuthProvider>
-      <UserDetailContext.Provider value={{ userDetail, setUserDetail }}>
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="index"
-            options={{
-              headerShown: false
-            }} />
-          <Stack.Screen name="auth/signIn"
-            options={{
-              headerShown: false
-            }} />
-          <Stack.Screen name="auth/signUp"
-            options={{
-              headerShown: false
-            }} />
-          <Stack.Screen name="(drawer)" />
-        </Stack>
-      </UserDetailContext.Provider>
+      <NotificationProvider>
+        <UserDetailContext.Provider value={{ userDetail, setUserDetail }}>
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="index"
+              options={{
+                headerShown: false
+              }} />
+            <Stack.Screen name="auth/signIn"
+              options={{
+                headerShown: false
+              }} />
+            <Stack.Screen name="auth/signUp"
+              options={{
+                headerShown: false
+              }} />
+            <Stack.Screen name="(drawer)" />
+          </Stack>
+        </UserDetailContext.Provider>
+      </NotificationProvider>
     </AuthProvider>
   );
 }

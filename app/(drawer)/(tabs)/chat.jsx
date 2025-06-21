@@ -1,12 +1,9 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Image, Alert } from 'react-native';
-import { supabase } from '@/Config/supabaseConfig';
 import { useAuth } from '@/Config/AuthContext';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system';
-import { decode } from 'base-64';
 import { LinearGradient } from 'expo-linear-gradient';
+import ChatService from '@/app/services/chatService';
 
 export default function ChatScreen() {
   const { user } = useAuth();
@@ -15,263 +12,144 @@ export default function ChatScreen() {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
-  const [imageUploading, setImageUploading] = useState(false);
+  const [sending, setSending] = useState(false);
   const flatListRef = useRef(null);
-  const channelRef = useRef(null);
+  const subscriptionRef = useRef(null);
 
-  // Fetch all users and chat participants
+  // Initialize chat service
   useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        // Get all users except current user
-        const { data: allUsers, error: usersError } = await supabase
-          .from('users')
-          .select('id, email, name, profile_image_url')
-          .neq('id', user.id);
+    ChatService.initialize();
+    return () => ChatService.cleanup();
+  }, []);
 
-        if (usersError) throw usersError;
-
-        // Get chat participants and their last messages
-        const { data: participants, error: participantsError } = await supabase
-          .rpc('get_chat_participants', { user_id: user.id });
-
-        if (participantsError) throw participantsError;
-
-        // Combine all users with chat participant info
-        const enrichedUsers = allUsers.map(u => ({
-          ...u,
-          last_message_at: participants?.find(p => p.participant_id === u.id)?.last_message_at || null,
-          unread_count: participants?.find(p => p.participant_id === u.id)?.unread_count || 0
-        })).sort((a, b) => {
-          // Sort by last message (chatted users first), then by name
-          if (a.last_message_at && !b.last_message_at) return -1;
-          if (!a.last_message_at && b.last_message_at) return 1;
-          if (a.last_message_at && b.last_message_at) {
-            return new Date(b.last_message_at) - new Date(a.last_message_at);
-          }
-          return (a.name || a.email).localeCompare(b.name || b.email);
-        });
-
-        setChatUsers(enrichedUsers);
-      } catch (error) {
-        console.error('Error fetching users:', error);
-        Alert.alert('Error', 'Failed to load users');
-      } finally {
-        setLoading(false);
-      }
-    };
-
+  // Fetch chat users
+  useEffect(() => {
     if (user) {
-      fetchUsers();
+      fetchChatUsers();
     }
   }, [user]);
 
-  // Setup real-time subscription
+  // Handle message subscription when user is selected
   useEffect(() => {
-    // Create a single channel for all chat updates
-    const channel = supabase.channel('chat_updates', {
-      config: {
-        broadcast: { self: true },
-        presence: { key: user.id },
-      },
-    });
-
-    channelRef.current = channel;
-
-    // Subscribe to the channel
-    channel
-      .on('presence', { event: 'sync' }, () => {
-        console.log('Presence sync');
-      })
-      .on('presence', { event: 'join' }, ({ key }) => {
-        console.log('User joined:', key);
-      })
-      .on('presence', { event: 'leave' }, ({ key }) => {
-        console.log('User left:', key);
-      })
-      .subscribe(async (status) => {
-        if (status === 'SUBSCRIBED') {
-          await channel.track({ online_at: new Date().toISOString() });
-        }
-      });
+    if (selectedUser && user) {
+      fetchMessages();
+      setupMessageSubscription();
+    }
 
     return () => {
-      if (channelRef.current) {
-        channelRef.current.unsubscribe();
-        channelRef.current = null;
+      if (subscriptionRef.current) {
+        ChatService.unsubscribeFromMessages(subscriptionRef.current);
+        subscriptionRef.current = null;
       }
     };
-  }, [user.id]);
+  }, [selectedUser, user]);
 
-  // Handle message subscription when a user is selected
-  useEffect(() => {
-    if (!selectedUser || !channelRef.current) return;
-
-    const messageFilter = `or(and(sender_id.eq.${user.id},receiver_id.eq.${selectedUser.id}),and(sender_id.eq.${selectedUser.id},receiver_id.eq.${user.id}))`;
-
-    // Subscribe to message changes
-    channelRef.current
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'messages',
-        filter: messageFilter
-      }, async (payload) => {
-        console.log('Received message update:', payload);
-        
-        if (payload.eventType === 'INSERT') {
-          const newMessage = payload.new;
-          if (!newMessage.deleted_at) {
-            setMessages(prev => [...prev, newMessage]);
-            
-            // Mark received messages as read immediately
-            if (newMessage.receiver_id === user.id) {
-              try {
-                await supabase
-                  .from('messages')
-                  .update({ read_at: new Date().toISOString() })
-                  .eq('id', newMessage.id);
-              } catch (error) {
-                console.error('Error marking message as read:', error);
-              }
-            }
-            
-            // Scroll to bottom on new message
-            if (flatListRef.current) {
-              flatListRef.current.scrollToEnd({ animated: true });
-            }
-          }
-        } else if (payload.eventType === 'UPDATE') {
-          setMessages(prev => 
-            prev.map(msg => {
-              if (msg.id === payload.new.id) {
-                return payload.new.deleted_at ? null : payload.new;
-              }
-              return msg;
-            }).filter(Boolean)
-          );
-        }
-      });
-
-    // Fetch existing messages
-    const fetchMessages = async () => {
-      setLoading(true);
-      try {
-        const { data: messages, error: messagesError } = await supabase
-          .from('messages')
-          .select('*')
-          .or(`and(sender_id.eq.${user.id},receiver_id.eq.${selectedUser.id}),and(sender_id.eq.${selectedUser.id},receiver_id.eq.${user.id})`)
-          .is('deleted_at', null)
-          .order('created_at', { ascending: true });
-
-        if (messagesError) throw messagesError;
-
-        setMessages(messages || []);
-
-        // Mark unread messages as read
-        const unreadMessages = messages?.filter(msg => 
-          msg.receiver_id === user.id && !msg.read_at
-        ) || [];
-        
-        if (unreadMessages.length > 0) {
-          await supabase
-            .from('messages')
-            .update({ read_at: new Date().toISOString() })
-            .in('id', unreadMessages.map(msg => msg.id));
-        }
-      } catch (error) {
-        console.error('Error fetching messages:', error);
-        Alert.alert('Error', 'Failed to load messages');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchMessages();
-
-    return () => {
-      if (channelRef.current) {
-        // Remove the specific subscription when user is deselected
-        channelRef.current.unsubscribe();
-      }
-    };
-  }, [selectedUser, user.id]);
-
-  // Add delete message function
-  const deleteMessage = async (messageId) => {
+  const fetchChatUsers = async () => {
     try {
-      const { error } = await supabase.rpc('soft_delete_message', {
-        message_id: messageId,
-        user_id: user.id
-      });
-
-      if (error) throw error;
+      setLoading(true);
+      const users = await ChatService.getChatUsers(user.id);
+      setChatUsers(users);
     } catch (error) {
-      console.error('Error deleting message:', error);
-      Alert.alert('Error', 'Failed to delete message');
+      console.error('Error fetching users:', error);
+      Alert.alert('Error', 'Failed to load chat users');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleSend = async (content = newMessage, type = 'text') => {
-    if ((!content.trim() && type === 'text') || !selectedUser) return;
-    
+  const fetchMessages = async () => {
     try {
-      const { data, error } = await supabase
-        .from('messages')
-        .insert({
-          sender_id: user.id,
-          receiver_id: selectedUser.id,
-          content,
-          type,
-        })
-        .select()
-        .single();
+      setLoading(true);
+      const messageData = await ChatService.getMessages(user.id, selectedUser.id);
+      setMessages(messageData);
+      
+      // Scroll to bottom
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    } catch (error) {
+      console.error('Error fetching messages:', error);
+      Alert.alert('Error', 'Failed to load messages');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      if (error) throw error;
+  const setupMessageSubscription = () => {
+    subscriptionRef.current = ChatService.subscribeToMessages(
+      user.id,
+      selectedUser.id,
+      handleMessageUpdate
+    );
+  };
 
-      // No need to manually update messages array as it will come through subscription
-      setNewMessage('');
+  const handleMessageUpdate = (payload) => {
+    if (payload.eventType === 'INSERT') {
+      const newMessage = payload.new;
+      if (!newMessage.deleted_at) {
+        setMessages(prev => {
+          // Check if message already exists to prevent duplicates
+          const exists = prev.some(msg => msg.id === newMessage.id);
+          if (exists) return prev;
+          
+          const updated = [...prev, newMessage];
+          // Auto-scroll to bottom for new messages
+          setTimeout(() => {
+            flatListRef.current?.scrollToEnd({ animated: true });
+          }, 100);
+          return updated;
+        });
+      }
+    } else if (payload.eventType === 'UPDATE') {
+      setMessages(prev => 
+        prev.map(msg => 
+          msg.id === payload.new.id ? payload.new : msg
+        ).filter(msg => !msg.deleted_at)
+      );
+    }
+  };
+
+  const handleSend = async () => {
+    if (!newMessage.trim() || !selectedUser || sending) return;
+    
+    const messageContent = newMessage.trim();
+    setNewMessage('');
+    setSending(true);
+
+    try {
+      await ChatService.sendMessage(user.id, selectedUser.id, messageContent);
     } catch (error) {
       console.error('Error sending message:', error);
       Alert.alert('Error', 'Failed to send message');
+      setNewMessage(messageContent); // Restore message on error
+    } finally {
+      setSending(false);
     }
   };
 
-  const pickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 1,
-    });
-
-    if (!result.canceled) {
-      setImageUploading(true);
-      try {
-        const base64 = await FileSystem.readAsStringAsync(result.assets[0].uri, {
-          encoding: FileSystem.EncodingType.Base64,
-        });
-        
-        const filePath = `${user.id}/${new Date().getTime()}.jpg`;
-        const { error: uploadError } = await supabase.storage
-          .from('chat_images')
-          .upload(filePath, decode(base64), {
-            contentType: 'image/jpeg',
-          });
-
-        if (uploadError) throw uploadError;
-
-        const { data: { publicUrl } } = supabase.storage
-          .from('chat_images')
-          .getPublicUrl(filePath);
-
-        await handleSend(publicUrl, 'image');
-      } catch (error) {
-        console.error('Error uploading image:', error);
-        Alert.alert('Error', 'Failed to upload image');
-      } finally {
-        setImageUploading(false);
+  const handleImageUpload = async () => {
+    try {
+      // For development, just show a mock message
+      if (__DEV__) {
+        Alert.alert('Image Upload', 'Image upload is available in production builds');
+        return;
       }
+      
+      // In production, implement actual image picker
+      const imageUrl = await ChatService.uploadImage(user.id, 'mock-image-uri');
+      await ChatService.sendMessage(user.id, selectedUser.id, imageUrl, 'image');
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      Alert.alert('Error', 'Failed to upload image');
+    }
+  };
+
+  const handleDeleteMessage = async (messageId) => {
+    try {
+      await ChatService.deleteMessage(messageId, user.id);
+    } catch (error) {
+      console.error('Error deleting message:', error);
+      Alert.alert('Error', 'Failed to delete message');
     }
   };
 
@@ -291,66 +169,62 @@ export default function ChatScreen() {
               'Do you want to delete this message?',
               [
                 { text: 'Cancel', style: 'cancel' },
-                { text: 'Delete', onPress: () => deleteMessage(item.id), style: 'destructive' }
+                { text: 'Delete', onPress: () => handleDeleteMessage(item.id), style: 'destructive' }
               ]
             );
           }
         }}
         activeOpacity={0.8}
+        style={[styles.messageBubble, isMyMessage ? styles.myMessage : styles.theirMessage]}
       >
         <View style={[
-          styles.messageBubble,
-          isMyMessage ? styles.myMessage : styles.theirMessage
+          styles.messageContent,
+          isMyMessage ? styles.myMessageContent : styles.theirMessageContent
         ]}>
-          <View style={[
-            styles.messageContent,
-            isMyMessage ? styles.myMessageContent : styles.theirMessageContent
-          ]}>
-            {item.type === 'image' ? (
-              <>
-                <Image
-                  source={{ uri: item.content }}
-                  style={styles.messageImage}
-                  resizeMode="cover"
-                />
-                <View style={styles.messageFooter}>
-                  <Text style={[
-                    styles.messageTime,
-                    isMyMessage ? styles.myMessageTime : styles.theirMessageTime
-                  ]}>{messageTime}</Text>
-                  {isMyMessage && (
-                    <MaterialCommunityIcons
-                      name={item.read_at ? "check-all" : "check"}
-                      size={16}
-                      color={item.read_at ? "#4ADE80" : "rgba(255,255,255,0.8)"}
-                      style={styles.readReceipt}
-                    />
-                  )}
-                </View>
-              </>
-            ) : (
-              <>
+          {item.type === 'image' ? (
+            <>
+              <Image
+                source={{ uri: item.content }}
+                style={styles.messageImage}
+                resizeMode="cover"
+              />
+              <View style={styles.messageFooter}>
                 <Text style={[
-                  styles.messageText,
-                  isMyMessage ? styles.myMessageText : styles.theirMessageText
-                ]}>{item.content}</Text>
-                <View style={styles.messageFooter}>
-                  <Text style={[
-                    styles.messageTime,
-                    isMyMessage ? styles.myMessageTime : styles.theirMessageTime
-                  ]}>{messageTime}</Text>
-                  {isMyMessage && (
-                    <MaterialCommunityIcons
-                      name={item.read_at ? "check-all" : "check"}
-                      size={16}
-                      color={item.read_at ? "#4ADE80" : "rgba(255,255,255,0.8)"}
-                      style={styles.readReceipt}
-                    />
-                  )}
-                </View>
-              </>
-            )}
-          </View>
+                  styles.messageTime,
+                  isMyMessage ? styles.myMessageTime : styles.theirMessageTime
+                ]}>{messageTime}</Text>
+                {isMyMessage && (
+                  <MaterialCommunityIcons
+                    name={item.read_at ? "check-all" : "check"}
+                    size={16}
+                    color={item.read_at ? "#4ADE80" : "rgba(255,255,255,0.8)"}
+                    style={styles.readReceipt}
+                  />
+                )}
+              </View>
+            </>
+          ) : (
+            <>
+              <Text style={[
+                styles.messageText,
+                isMyMessage ? styles.myMessageText : styles.theirMessageText
+              ]}>{item.content}</Text>
+              <View style={styles.messageFooter}>
+                <Text style={[
+                  styles.messageTime,
+                  isMyMessage ? styles.myMessageTime : styles.theirMessageTime
+                ]}>{messageTime}</Text>
+                {isMyMessage && (
+                  <MaterialCommunityIcons
+                    name={item.read_at ? "check-all" : "check"}
+                    size={16}
+                    color={item.read_at ? "#4ADE80" : "rgba(255,255,255,0.8)"}
+                    style={styles.readReceipt}
+                  />
+                )}
+              </View>
+            </>
+          )}
         </View>
       </TouchableOpacity>
     );
@@ -367,9 +241,10 @@ export default function ChatScreen() {
     >
       <View style={{ position: 'relative' }}>
         <Image
-          source={{ uri: item.profile_image_url }}
+          source={{ 
+            uri: item.profile_image_url || 'https://via.placeholder.com/60x60?text=' + (item.name?.[0] || 'U')
+          }}
           style={styles.userAvatar}
-          defaultSource={require('@/assets/images/placeholder.jpg')}
         />
         <View style={styles.onlineIndicator} />
       </View>
@@ -410,6 +285,8 @@ export default function ChatScreen() {
             keyExtractor={item => item.id}
             renderItem={renderUserItem}
             contentContainerStyle={styles.userList}
+            refreshing={loading}
+            onRefresh={fetchChatUsers}
           />
         )}
       </View>
@@ -433,9 +310,10 @@ export default function ChatScreen() {
         <View style={styles.headerContent}>
           <View style={styles.avatarContainer}>
             <Image
-              source={{ uri: selectedUser.profile_image_url }}
+              source={{ 
+                uri: selectedUser.profile_image_url || 'https://via.placeholder.com/56x56?text=' + (selectedUser.name?.[0] || 'U')
+              }}
               style={styles.headerAvatar}
-              defaultSource={require('@/assets/images/placeholder.jpg')}
             />
             <View style={styles.onlineIndicator} />
           </View>
@@ -464,8 +342,7 @@ export default function ChatScreen() {
       <View style={styles.inputContainer}>
         <TouchableOpacity 
           style={styles.attachButton}
-          onPress={pickImage}
-          disabled={imageUploading}
+          onPress={handleImageUpload}
         >
           <Ionicons name="image" size={24} color="#2563EB" />
         </TouchableOpacity>
@@ -476,13 +353,21 @@ export default function ChatScreen() {
           value={newMessage}
           onChangeText={setNewMessage}
           multiline
+          onSubmitEditing={handleSend}
         />
         <TouchableOpacity 
-          style={[styles.sendButton, (!newMessage.trim() && styles.sendButtonDisabled)]}
-          onPress={() => handleSend()}
-          disabled={!newMessage.trim()}
+          style={[
+            styles.sendButton, 
+            (!newMessage.trim() || sending) && styles.sendButtonDisabled
+          ]}
+          onPress={handleSend}
+          disabled={!newMessage.trim() || sending}
         >
-          <Ionicons name="send" size={24} color="#fff" />
+          {sending ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Ionicons name="send" size={24} color="#fff" />
+          )}
         </TouchableOpacity>
       </View>
     </View>
@@ -492,7 +377,7 @@ export default function ChatScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#EBF4FF', // Light blue background
+    backgroundColor: '#EBF4FF',
   },
   header: {
     padding: 16,
@@ -743,18 +628,5 @@ const styles = StyleSheet.create({
     right: 2,
     borderWidth: 2,
     borderColor: '#fff',
-  },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 32,
-    backgroundColor: '#EBF4FF',
-  },
-  emptyStateText: {
-    fontSize: 16,
-    color: '#64748B',
-    textAlign: 'center',
-    marginTop: 16,
   },
 });

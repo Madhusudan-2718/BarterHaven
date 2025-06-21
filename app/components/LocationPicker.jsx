@@ -7,93 +7,35 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
-  Modal,
-  Dimensions,
-  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import LocationService from '@/app/services/locationService';
-import MapView, { Marker } from 'react-native-maps';
-
-const { width, height } = Dimensions.get('window');
+import MapService from '@/app/services/mapService';
+import SimpleMap from './SimpleMap';
 
 export default function LocationPicker({
   onLocationSelect,
   initialLocation = null,
-  showMap = true,
   style,
   placeholder = "Enter address manually...",
 }) {
   const [location, setLocation] = useState(initialLocation);
   const [address, setAddress] = useState('');
   const [loading, setLoading] = useState(false);
-  const [showMapModal, setShowMapModal] = useState(false);
   const [manualEdit, setManualEdit] = useState(false);
-  const [locationEnabled, setLocationEnabled] = useState(false);
-  const [nativeModulesAvailable, setNativeModulesAvailable] = useState(false);
-  const [mapLocation, setMapLocation] = useState(initialLocation ? {
-    latitude: initialLocation.latitude || 37.78825,
-    longitude: initialLocation.longitude || -122.4324,
-  } : { latitude: 37.78825, longitude: -122.4324 });
-  const [mapAddress, setMapAddress] = useState(initialLocation?.address?.fullAddress || '');
 
   useEffect(() => {
     if (initialLocation?.address?.fullAddress) {
       setAddress(initialLocation.address.fullAddress);
     }
-    checkLocationServices();
   }, [initialLocation]);
-
-  const checkLocationServices = async () => {
-    try {
-      const isAvailable = await LocationService.isNativeLocationAvailable();
-      setNativeModulesAvailable(isAvailable);
-      
-      if (isAvailable) {
-        const enabled = await LocationService.isLocationEnabled();
-        setLocationEnabled(enabled);
-      } else {
-        setLocationEnabled(false);
-      }
-    } catch (error) {
-      console.error('Error checking location services:', error);
-      setLocationEnabled(false);
-      setNativeModulesAvailable(false);
-    }
-  };
 
   const handleUseMyLocation = async () => {
     try {
       setLoading(true);
-      
-      if (!nativeModulesAvailable) {
-        Alert.alert(
-          'Location Services Unavailable',
-          'Location services are currently not available. Please enter your address manually.',
-          [
-            { text: 'OK' },
-            { text: 'Enter Manually', onPress: () => setManualEdit(true) }
-          ]
-        );
-        return;
-      }
-      
-      if (!locationEnabled) {
-        Alert.alert(
-          'Location Services Disabled',
-          'Please enable location services in your device settings to use this feature.',
-          [
-            { text: 'OK' },
-            { text: 'Enter Manually', onPress: () => setManualEdit(true) }
-          ]
-        );
-        return;
-      }
-
-      const locationData = await LocationService.getLocationWithAddress();
+      const locationData = await MapService.getLocationWithAddress();
       
       setLocation(locationData);
-      setAddress(locationData.address.fullAddress);
+      setAddress(locationData.address?.fullAddress || '');
       setManualEdit(false);
       
       if (onLocationSelect) {
@@ -103,9 +45,7 @@ export default function LocationPicker({
       console.error('Error getting location:', error);
       Alert.alert(
         'Location Error',
-        error.message === 'Location permission denied'
-          ? 'Please enable location permissions in your device settings to use this feature.'
-          : 'Failed to get your current location. Please try again or enter your address manually.',
+        'Failed to get your current location. You can enter your address manually.',
         [
           { text: 'OK' },
           { text: 'Enter Manually', onPress: () => setManualEdit(true) }
@@ -137,36 +77,6 @@ export default function LocationPicker({
     }
   };
 
-  const handleMapPress = async (event) => {
-    const { latitude, longitude } = event.nativeEvent.coordinate;
-    setMapLocation({ latitude, longitude });
-    try {
-      const address = await LocationService.reverseGeocode(latitude, longitude);
-      setMapAddress(address.fullAddress);
-    } catch (e) {
-      setMapAddress('');
-    }
-  };
-
-  const handleConfirmMapLocation = async () => {
-    if (!mapLocation.latitude || !mapLocation.longitude) return;
-    try {
-      const address = await LocationService.reverseGeocode(mapLocation.latitude, mapLocation.longitude);
-      const locationData = {
-        latitude: mapLocation.latitude,
-        longitude: mapLocation.longitude,
-        address,
-      };
-      setLocation(locationData);
-      setAddress(address.fullAddress);
-      setManualEdit(false);
-      setShowMapModal(false);
-      if (onLocationSelect) onLocationSelect(locationData);
-    } catch (e) {
-      Alert.alert('Error', 'Could not get address for selected location.');
-    }
-  };
-
   const handleForwardGeocode = async () => {
     if (!address.trim()) {
       Alert.alert('Error', 'Please enter an address first');
@@ -175,7 +85,7 @@ export default function LocationPicker({
 
     try {
       setLoading(true);
-      const coordinates = await LocationService.forwardGeocode(address);
+      const coordinates = await MapService.forwardGeocode(address);
       
       const locationData = {
         latitude: coordinates.latitude,
@@ -201,46 +111,15 @@ export default function LocationPicker({
     }
   };
 
-  const renderMapModal = () => (
-    <Modal
-      visible={showMapModal}
-      animationType="slide"
-      presentationStyle="pageSheet"
-    >
-      <View style={styles.mapModalContainer}>
-        <View style={styles.mapHeader}>
-          <Text style={styles.mapTitle}>Select Location</Text>
-          <TouchableOpacity
-            onPress={() => setShowMapModal(false)}
-            style={styles.closeButton}
-          >
-            <Ionicons name="close" size={24} color="#333" />
-          </TouchableOpacity>
-        </View>
-        <MapView
-          style={{ flex: 1 }}
-          initialRegion={{
-            latitude: mapLocation.latitude,
-            longitude: mapLocation.longitude,
-            latitudeDelta: 0.01,
-            longitudeDelta: 0.01,
-          }}
-          onPress={handleMapPress}
-        >
-          <Marker coordinate={mapLocation} />
-        </MapView>
-        <View style={styles.mapFooter}>
-          <Text style={styles.addressText}>{mapAddress || 'Tap on the map to select a location'}</Text>
-          <TouchableOpacity
-            style={styles.confirmButton}
-            onPress={handleConfirmMapLocation}
-          >
-            <Text style={styles.confirmButtonText}>Confirm Location</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </Modal>
-  );
+  const handleLocationSelect = (selectedLocation) => {
+    setLocation(selectedLocation);
+    setAddress(selectedLocation.address?.fullAddress || '');
+    setManualEdit(false);
+    
+    if (onLocationSelect) {
+      onLocationSelect(selectedLocation);
+    }
+  };
 
   return (
     <View style={[styles.container, style]}>
@@ -259,16 +138,6 @@ export default function LocationPicker({
             {loading ? 'Getting Location...' : 'Use My Location'}
           </Text>
         </TouchableOpacity>
-        
-        {showMap && (
-          <TouchableOpacity
-            style={styles.mapButton}
-            onPress={() => setShowMapModal(true)}
-          >
-            <Ionicons name="map" size={20} color="#3B82F6" />
-            <Text style={styles.mapButtonText}>Map</Text>
-          </TouchableOpacity>
-        )}
       </View>
 
       <View style={styles.addressContainer}>
@@ -281,6 +150,7 @@ export default function LocationPicker({
           multiline
           numberOfLines={3}
           textAlignVertical="top"
+          onFocus={() => setManualEdit(true)}
         />
         {manualEdit && (
           <View style={styles.manualEditActions}>
@@ -293,7 +163,7 @@ export default function LocationPicker({
               <Text style={styles.geocodeButtonText}>Convert to Coordinates</Text>
             </TouchableOpacity>
             <Text style={styles.manualEditNote}>
-              Manual entry - location coordinates will not be saved
+              Manual entry - tap "Convert to Coordinates" to get location data
             </Text>
           </View>
         )}
@@ -307,22 +177,28 @@ export default function LocationPicker({
           </Text>
           {location.accuracy && (
             <Text style={styles.accuracyText}>
-              Accuracy: {location.accuracy.toFixed(1)}m ({LocationService.getAccuracyLevel(location.accuracy)})
+              Accuracy: {location.accuracy.toFixed(1)}m ({MapService.getAccuracyLevel(location.accuracy)})
             </Text>
           )}
         </View>
       )}
 
-      {!nativeModulesAvailable && (
+      <SimpleMap
+        latitude={location?.latitude}
+        longitude={location?.longitude}
+        address={address}
+        interactive={true}
+        onLocationSelect={handleLocationSelect}
+      />
+
+      {__DEV__ && (
         <View style={styles.locationWarning}>
-          <Ionicons name="warning" size={16} color="#F59E0B" />
+          <Ionicons name="information-circle" size={16} color="#3B82F6" />
           <Text style={styles.locationWarningText}>
-            Location services are not available. Enable them in device settings for full functionality.
+            Development mode: Using mock location services. Full functionality available in production builds.
           </Text>
         </View>
       )}
-
-      {renderMapModal()}
     </View>
   );
 }
@@ -340,12 +216,9 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   locationButtonContainer: {
-    flexDirection: 'row',
     marginBottom: 16,
-    gap: 12,
   },
   useLocationButton: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -357,23 +230,6 @@ const styles = StyleSheet.create({
   },
   useLocationButtonText: {
     color: '#fff',
-    fontWeight: '600',
-    fontSize: 16,
-  },
-  mapButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#EFF6FF',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#3B82F6',
-    gap: 8,
-  },
-  mapButtonText: {
-    color: '#3B82F6',
     fontWeight: '600',
     fontSize: 16,
   },
@@ -423,6 +279,7 @@ const styles = StyleSheet.create({
   },
   coordinatesContainer: {
     marginTop: 8,
+    marginBottom: 12,
   },
   coordinatesLabel: {
     fontSize: 14,
@@ -444,57 +301,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 8,
-    backgroundColor: '#FEF3C7',
+    backgroundColor: '#EFF6FF',
     borderRadius: 6,
     marginTop: 8,
   },
   locationWarningText: {
     fontSize: 12,
-    color: '#92400E',
+    color: '#1D4ED8',
     marginLeft: 6,
     flex: 1,
-  },
-  mapModalContainer: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  mapHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  mapTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#374151',
-  },
-  closeButton: {
-    padding: 4,
-  },
-  mapFooter: {
-    padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-  },
-  addressText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 12,
-  },
-  confirmButton: {
-    backgroundColor: '#3B82F6',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  confirmButtonText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 16,
   },
 }); 

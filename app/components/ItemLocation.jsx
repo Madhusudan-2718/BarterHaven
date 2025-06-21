@@ -8,8 +8,8 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import LocationService from '@/app/services/locationService';
-import MapView, { Marker } from 'react-native-maps';
+import MapService from '@/app/services/mapService';
+import SimpleMap from './SimpleMap';
 
 export default function ItemLocation({
   item,
@@ -27,7 +27,7 @@ export default function ItemLocation({
 
   const calculateDistance = async () => {
     try {
-      const calculatedDistance = await LocationService.calculateDistance(
+      const calculatedDistance = MapService.calculateDistance(
         userLocation.latitude,
         userLocation.longitude,
         item.latitude,
@@ -81,68 +81,14 @@ export default function ItemLocation({
   }
 
   return (
-    <View style={[styles.container, style]}>
-      <View style={styles.locationInfo}>
-        <Ionicons name="location" size={20} color="#3B82F6" />
-        <View style={styles.locationTextContainer}>
-          <Text style={styles.locationText}>{getLocationText()}</Text>
-          {distance && (
-            <Text style={styles.distanceText}>
-              {distance.toFixed(1)} km away
-            </Text>
-          )}
-        </View>
-      </View>
-
-      {(item?.latitude && item?.longitude) && (
-        <TouchableOpacity
-          style={styles.mapButton}
-          onPress={handleMapPress}
-        >
-          <Ionicons name="map-outline" size={16} color="#3B82F6" />
-          <Text style={styles.mapButtonText}>View Map</Text>
-        </TouchableOpacity>
-      )}
-
-      <Modal
-        visible={showMapModal}
-        animationType="slide"
-        presentationStyle="pageSheet"
-      >
-        <View style={styles.mapModalContainer}>
-          <View style={styles.mapHeader}>
-            <Text style={styles.mapTitle}>Item Location</Text>
-            <TouchableOpacity
-              onPress={() => setShowMapModal(false)}
-              style={styles.closeButton}
-            >
-              <Ionicons name="close" size={24} color="#333" />
-            </TouchableOpacity>
-          </View>
-          <MapView
-            style={{ flex: 1 }}
-            initialRegion={{
-              latitude: item.latitude,
-              longitude: item.longitude,
-              latitudeDelta: 0.01,
-              longitudeDelta: 0.01,
-            }}
-            scrollEnabled={false}
-            zoomEnabled={false}
-          >
-            <Marker coordinate={{ latitude: item.latitude, longitude: item.longitude }} />
-          </MapView>
-          <View style={styles.mapFooter}>
-            <Text style={styles.addressText}>{getFullAddress()}</Text>
-            {distance && (
-              <Text style={styles.distanceText}>
-                Distance: {distance.toFixed(1)} km
-              </Text>
-            )}
-          </View>
-        </View>
-      </Modal>
-    </View>
+    <SimpleMap
+      latitude={item?.latitude}
+      longitude={item?.longitude}
+      address={getFullAddress()}
+      style={style}
+      showDistance={true}
+      userLocation={userLocation}
+    />
   );
 }
 

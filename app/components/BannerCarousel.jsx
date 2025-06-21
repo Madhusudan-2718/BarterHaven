@@ -32,8 +32,14 @@ const BannerCarousel = ({ children, autoplay = true, autoplayInterval = 5000 }) 
         }
         timerRef.current = setInterval(() => {
             const nextIndex = (currentIndex + 1) % React.Children.count(children);
-            flatListRef.current?.scrollToIndex({ index: nextIndex, animated: true });
-            setCurrentIndex(nextIndex);
+            try {
+                flatListRef.current?.scrollToIndex({ index: nextIndex, animated: true });
+                setCurrentIndex(nextIndex);
+            } catch (error) {
+                // Fallback to scroll to offset if scrollToIndex fails
+                flatListRef.current?.scrollToOffset({ offset: nextIndex * width, animated: true });
+                setCurrentIndex(nextIndex);
+            }
         }, autoplayInterval);
     };
 
@@ -62,8 +68,14 @@ const BannerCarousel = ({ children, autoplay = true, autoplayInterval = 5000 }) 
             <TouchableOpacity
                 key={index}
                 onPress={() => {
-                    flatListRef.current?.scrollToIndex({ index, animated: true });
-                    setCurrentIndex(index);
+                    try {
+                        flatListRef.current?.scrollToIndex({ index, animated: true });
+                        setCurrentIndex(index);
+                    } catch (error) {
+                        // Fallback to scroll to offset if scrollToIndex fails
+                        flatListRef.current?.scrollToOffset({ offset: index * width, animated: true });
+                        setCurrentIndex(index);
+                    }
                 }}
             >
                 <Animated.View style={[styles.dot, dotStyle]} />
@@ -87,6 +99,18 @@ const BannerCarousel = ({ children, autoplay = true, autoplayInterval = 5000 }) 
                     <View style={styles.slide}>{item}</View>
                 )}
                 keyExtractor={(_, index) => index.toString()}
+                getItemLayout={(data, index) => ({
+                    length: width,
+                    offset: width * index,
+                    index,
+                })}
+                onScrollToIndexFailed={(info) => {
+                    // Fallback: scroll to the nearest valid offset
+                    flatListRef.current?.scrollToOffset({
+                        offset: info.averageItemLength * info.index,
+                        animated: true,
+                    });
+                }}
             />
             <View style={styles.pagination}>
                 {React.Children.map(children, (_, index) => renderDot(index))}

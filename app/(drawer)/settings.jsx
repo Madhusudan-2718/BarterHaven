@@ -12,11 +12,13 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/Config/supabaseConfig';
+import NotificationPreferences from '@/app/components/NotificationPreferences';
 
 export default function SettingsScreen() {
     const router = useRouter();
     const [notificationsEnabled, setNotificationsEnabled] = useState(true);
     const [locationEnabled, setLocationEnabled] = useState(true);
+    const [showNotificationPreferences, setShowNotificationPreferences] = useState(false);
 
     const handleLogout = () => {
         Alert.alert(
@@ -108,10 +110,10 @@ export default function SettingsScreen() {
                     <Text style={styles.sectionTitle}>Preferences</Text>
                     <SettingItem
                         icon="notifications-outline"
-                        title="Push Notifications"
-                        description="Receive notifications about trades and messages"
-                        value={notificationsEnabled}
-                        onValueChange={setNotificationsEnabled}
+                        title="Notification Settings"
+                        description="Manage your notification preferences"
+                        type="button"
+                        onValueChange={() => setShowNotificationPreferences(true)}
                     />
                     <SettingItem
                         icon="location-outline"
@@ -166,6 +168,12 @@ export default function SettingsScreen() {
                     <Text style={styles.logoutText}>Logout</Text>
                 </TouchableOpacity>
             </ScrollView>
+            
+            {/* Notification Preferences Modal */}
+            <NotificationPreferences
+                visible={showNotificationPreferences}
+                onClose={() => setShowNotificationPreferences(false)}
+            />
         </View>
     );
 }

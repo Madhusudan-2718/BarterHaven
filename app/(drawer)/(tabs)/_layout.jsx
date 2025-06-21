@@ -4,9 +4,12 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import AntDesign from '@expo/vector-icons/AntDesign';
 import Entypo from '@expo/vector-icons/Entypo';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { StyleSheet, View, TextInput, Image, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, TextInput, Image, TouchableOpacity, Text } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '@/Config/supabaseConfig';
+import { useNotifications } from '@/context/NotificationContext';
+import NotificationCenter from '@/app/components/NotificationCenter';
+import NotificationPreferences from '@/app/components/NotificationPreferences';
 
 export const SearchContext = createContext();
 
@@ -14,6 +17,10 @@ export default function Tablayout() {
   const navigation = useNavigation();
   const [search, setSearch] = useState('');
   const [isFocused, setIsFocused] = useState(false);
+  const [showNotificationCenter, setShowNotificationCenter] = useState(false);
+  const [showNotificationPreferences, setShowNotificationPreferences] = useState(false);
+  const { notificationCount, chatBadgeCount } = useNotifications();
+
   return (
     <SearchContext.Provider value={{ search, setSearch }}>
       {/* Custom Header */}
@@ -29,6 +36,20 @@ export default function Tablayout() {
           <View style={styles.logoContainer}>
             <Image source={require('../../../assets/images/BH_LOGO.png')} style={styles.logo} />
           </View>
+          <TouchableOpacity
+            onPress={() => setShowNotificationCenter(true)}
+            style={styles.notificationButton}
+            hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
+          >
+            <Ionicons name="notifications" size={24} color="#075eec" />
+            {notificationCount > 0 && (
+              <View style={styles.notificationBadge}>
+                <Text style={styles.notificationBadgeText}>
+                  {notificationCount > 99 ? '99+' : notificationCount}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
         </View>
         <View style={[styles.searchBarContainer, isFocused && styles.searchBarFocused]}>
           <Ionicons name="search" size={20} color="#075eec" style={{ marginLeft: 12, marginRight: 6 }} />
@@ -95,7 +116,16 @@ export default function Tablayout() {
           options={{
             headerShown: false,
             tabBarIcon: ({ color, size, focused }) => (
-              <Entypo name="chat" size={size} color={color} style={focused ? styles.activeIcon : {}} />
+              <View style={styles.tabIconContainer}>
+                <Entypo name="chat" size={size} color={color} style={focused ? styles.activeIcon : {}} />
+                {chatBadgeCount > 0 && (
+                  <View style={styles.tabBadge}>
+                    <Text style={styles.tabBadgeText}>
+                      {chatBadgeCount > 9 ? '9+' : chatBadgeCount}
+                    </Text>
+                  </View>
+                )}
+              </View>
             ),
           }}
         />
@@ -109,6 +139,17 @@ export default function Tablayout() {
           }}
         />
       </Tabs>
+
+      {/* Notification Modals */}
+      <NotificationCenter
+        visible={showNotificationCenter}
+        onClose={() => setShowNotificationCenter(false)}
+      />
+      
+      <NotificationPreferences
+        visible={showNotificationPreferences}
+        onClose={() => setShowNotificationPreferences(false)}
+      />
     </SearchContext.Provider>
   );
 }
@@ -192,5 +233,48 @@ const styles = StyleSheet.create({
     textShadowColor: '#fff',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 8,
+  },
+  notificationButton: {
+    position: 'absolute',
+    right: 0,
+    padding: 12,
+    borderRadius: 24,
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    backgroundColor: '#ff4444',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'white',
+  },
+  notificationBadgeText: {
+    color: 'white',
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
+  tabIconContainer: {
+    position: 'relative',
+  },
+  tabBadge: {
+    position: 'absolute',
+    top: -5,
+    right: -8,
+    backgroundColor: '#ff4444',
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  tabBadgeText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
 });
