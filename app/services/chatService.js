@@ -85,8 +85,13 @@ class ChatService {
     }
   }
 
+<<<<<<< HEAD
   // Enhanced: Send a message (optionally linked to a trade)
   async sendMessage({ senderId, receiverId, content, tradeId = null, type = 'text' }) {
+=======
+  // Send a message
+  async sendMessage(senderId, receiverId, content, type = 'text') {
+>>>>>>> dfaf75ddffb04c209e31d6e3794016ab3b87dde4
     try {
       const { data, error } = await supabase
         .from('messages')
@@ -95,10 +100,17 @@ class ChatService {
           receiver_id: receiverId,
           content,
           type,
+<<<<<<< HEAD
           trade_id: tradeId || null,
         })
         .select()
         .single();
+=======
+        })
+        .select()
+        .single();
+
+>>>>>>> dfaf75ddffb04c209e31d6e3794016ab3b87dde4
       if (error) throw error;
       return data;
     } catch (error) {
@@ -221,6 +233,7 @@ class ChatService {
     }
   }
 
+<<<<<<< HEAD
   // Enhanced: Get messages between two users, optionally filtered by trade
   async getMessagesByUser(userId, otherUserId, tradeId = null) {
     try {
@@ -266,6 +279,8 @@ class ChatService {
     }
   }
 
+=======
+>>>>>>> dfaf75ddffb04c209e31d6e3794016ab3b87dde4
   // Cleanup all subscriptions
   cleanup() {
     this.subscriptions.forEach((subscription) => {

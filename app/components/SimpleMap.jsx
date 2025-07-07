@@ -150,11 +150,15 @@ export default function SimpleMap({
         <Ionicons name="location" size={20} color="#3B82F6" />
         <View style={styles.locationTextContainer}>
           <Text style={styles.locationText}>
+<<<<<<< HEAD
             {typeof address === 'string'
               ? address
               : address && address.fullAddress
                 ? address.fullAddress
                 : `${latitude?.toFixed(4)}, ${longitude?.toFixed(4)}`}
+=======
+            {address || `${latitude?.toFixed(4)}, ${longitude?.toFixed(4)}`}
+>>>>>>> dfaf75ddffb04c209e31d6e3794016ab3b87dde4
           </Text>
           {distance && (
             <Text style={styles.distanceText}>

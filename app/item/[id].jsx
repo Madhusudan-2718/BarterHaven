@@ -21,11 +21,14 @@ export default function ItemDetails() {
     const [billDocument, setBillDocument] = useState(null);
     const [userLocation, setUserLocation] = useState(null);
     const { user } = useAuth();
+<<<<<<< HEAD
     const [showManualBarterModal, setShowManualBarterModal] = useState(false);
     const [userItems, setUserItems] = useState([]);
     const [selectedUserItemId, setSelectedUserItemId] = useState(null);
     const [manualMessage, setManualMessage] = useState('');
     const [manualExchangeMode, setManualExchangeMode] = useState('online');
+=======
+>>>>>>> dfaf75ddffb04c209e31d6e3794016ab3b87dde4
 
     useEffect(() => {
         const fetchItem = async () => {
@@ -102,6 +105,7 @@ export default function ItemDetails() {
         }
     }, [id, user]);
 
+<<<<<<< HEAD
     // Fetch user's own items for manual barter
     useEffect(() => {
         if (user && showManualBarterModal) {
@@ -116,6 +120,8 @@ export default function ItemDetails() {
         }
     }, [user, showManualBarterModal]);
 
+=======
+>>>>>>> dfaf75ddffb04c209e31d6e3794016ab3b87dde4
     const handleProposeTrade = async (matchedItemId) => {
         if (!user) {
             Alert.alert('Error', 'Please sign in to propose a trade');
@@ -216,6 +222,7 @@ export default function ItemDetails() {
         );
     };
 
+<<<<<<< HEAD
     const handleManualBarter = async () => {
         if (!user) {
             Alert.alert('Error', 'Please sign in to propose a trade');
@@ -278,6 +285,8 @@ export default function ItemDetails() {
         Alert.alert('Success', 'Trade proposal sent successfully');
     };
 
+=======
+>>>>>>> dfaf75ddffb04c209e31d6e3794016ab3b87dde4
     if (loading) {
         return (
             <View style={styles.centered}><ActivityIndicator size="large" color="#075eec" /></View>
@@ -299,6 +308,7 @@ export default function ItemDetails() {
                     <Text style={styles.title}>{item.title}</Text>
                     <Text style={styles.description}>{item.description}</Text>
                     
+<<<<<<< HEAD
                     {/* Manual Barter Button */}
                     <TouchableOpacity
                         style={{ backgroundColor: '#2563EB', padding: 12, borderRadius: 8, marginBottom: 16, alignItems: 'center' }}
@@ -406,6 +416,8 @@ export default function ItemDetails() {
                         </View>
                     </Modal>
 
+=======
+>>>>>>> dfaf75ddffb04c209e31d6e3794016ab3b87dde4
                     <View style={styles.details}>
                         <View style={styles.detailRow}>
                             <Ionicons name="pricetag" size={16} color="#6B7280" />
