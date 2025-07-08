@@ -1,4 +1,4 @@
-import React, { useState, createContext } from 'react';
+import React from 'react';
 import { Drawer } from 'expo-router/drawer';
 import { Ionicons } from '@expo/vector-icons';
 import { useColorScheme } from 'react-native';
@@ -6,17 +6,12 @@ import { DrawerContentScrollView, DrawerItemList, DrawerItem } from '@react-navi
 import { View, Text, StyleSheet, Image, Alert, Animated, Pressable } from 'react-native';
 import { useAuth } from '@/Config/AuthContext';
 import { supabase } from '@/Config/supabaseConfig';
-import TradesScreen from './trades';
-
-// Create a context for trades refresh
-export const TradesRefreshContext = createContext({ trigger: 0, refresh: () => {} });
 
 function CustomDrawerContent(props) {
     const { user } = useAuth();
     const [profile, setProfile] = React.useState(null);
     const { state } = props;
     const currentRoute = state?.routeNames[state.index] || '';
-    const [tradesRefresh, setTradesRefresh] = useState(0);
 
     React.useEffect(() => {
         if (user) {
@@ -127,11 +122,6 @@ function CustomDrawerContent(props) {
         );
     };
 
-    // This callback can be passed to TradeProposals and called after trade creation
-    const handleTradeChanged = () => {
-        setTradesRefresh(prev => prev + 1);
-    };
-
     return (
         <DrawerContentScrollView {...props} style={styles.drawerContent}>
             {/* User Profile Section */}
@@ -194,70 +184,65 @@ function CustomDrawerContent(props) {
 }
 
 export default function DrawerLayout() {
-    const [tradesRefresh, setTradesRefresh] = useState(0);
-    const refreshTrades = () => setTradesRefresh(prev => prev + 1);
-
     return (
-        <TradesRefreshContext.Provider value={{ trigger: tradesRefresh, refresh: refreshTrades }}>
-            <Drawer
-                drawerContent={(props) => <CustomDrawerContent {...props} />}
-                screenOptions={{
+        <Drawer
+            drawerContent={(props) => <CustomDrawerContent {...props} />}
+            screenOptions={{
+                headerShown: false,
+                drawerStyle: {
+                    backgroundColor: '#fff',
+                    width: 280,
+                },
+                drawerActiveBackgroundColor: '#075eec',
+                drawerActiveTintColor: '#fff',
+                drawerInactiveTintColor: '#075eec',
+            }}
+        >
+            <Drawer.Screen
+                name="(tabs)"
+                options={{
                     headerShown: false,
-                    drawerStyle: {
-                        backgroundColor: '#fff',
-                        width: 280,
-                    },
-                    drawerActiveBackgroundColor: '#075eec',
-                    drawerActiveTintColor: '#fff',
-                    drawerInactiveTintColor: '#075eec',
                 }}
-            >
-                <Drawer.Screen
-                    name="(tabs)"
-                    options={{
-                        headerShown: false,
-                    }}
-                />
-                <Drawer.Screen
-                    name="browse"
-                    options={{
-                        headerShown: false,
-                    }}
-                />
-                <Drawer.Screen
-                    name="trades"
-                    options={{
-                        headerShown: true,
-                        title: 'My Trades',
-                        headerStyle: {
-                            backgroundColor: '#fff',
-                        },
-                        headerTitleStyle: {
-                            color: '#075eec',
-                            fontFamily: 'outfit-bold',
-                            fontSize: 20,
-                        },
-                        headerTintColor: '#075eec',
-                    }}
-                />
-                <Drawer.Screen
-                    name="settings"
-                    options={{
-                        headerShown: true,
-                        title: 'Settings',
-                        headerStyle: {
-                            backgroundColor: '#fff',
-                        },
-                        headerTitleStyle: {
-                            color: '#075eec',
-                            fontFamily: 'outfit-bold',
-                            fontSize: 20,
-                        },
-                        headerTintColor: '#075eec',
-                    }}
-                />
-            </Drawer>
-        </TradesRefreshContext.Provider>
+            />
+            <Drawer.Screen
+                name="browse"
+                options={{
+                    headerShown: false,
+                }}
+            />
+            <Drawer.Screen
+                name="trades"
+                options={{
+                    headerShown: true,
+                    title: 'My Trades',
+                    headerStyle: {
+                        backgroundColor: '#fff',
+                    },
+                    headerTitleStyle: {
+                        color: '#075eec',
+                        fontFamily: 'outfit-bold',
+                        fontSize: 20,
+                    },
+                    headerTintColor: '#075eec',
+                }}
+            />
+            <Drawer.Screen
+                name="settings"
+                options={{
+                    headerShown: true,
+                    title: 'Settings',
+                    headerStyle: {
+                        backgroundColor: '#fff',
+                    },
+                    headerTitleStyle: {
+                        color: '#075eec',
+                        fontFamily: 'outfit-bold',
+                        fontSize: 20,
+                    },
+                    headerTintColor: '#075eec',
+                }}
+            />
+        </Drawer>
     );
 }
 

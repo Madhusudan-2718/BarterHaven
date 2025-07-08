@@ -299,53 +299,6 @@ export default function ItemDetails() {
                     <Text style={styles.title}>{item.title}</Text>
                     <Text style={styles.description}>{item.description}</Text>
                     
-                    <View style={styles.details}>
-                        <View style={styles.detailRow}>
-                            <Ionicons name="pricetag" size={16} color="#6B7280" />
-                            <Text style={styles.detailText}>Category: {item.category}</Text>
-                        </View>
-                        
-                        <View style={styles.detailRow}>
-                            <Ionicons name="checkmark-circle" size={16} color="#6B7280" />
-                            <Text style={styles.detailText}>Condition: {item.condition}</Text>
-                        </View>
-                        
-                        <View style={styles.detailRow}>
-                            <Ionicons name="swap-horizontal" size={16} color="#6B7280" />
-                            <Text style={styles.detailText}>Barter Type: {item.bartertype}</Text>
-                        </View>
-                    </View>
-
-                    <ItemLocation item={item} userLocation={userLocation} />
-                    
-                    <View style={styles.userInfo}>
-                        <Image 
-                            source={{ uri: item.users?.profile_image_url || require('../../assets/images/default-profile.png') }} 
-                            style={styles.userImage} 
-                        />
-                        <View style={styles.userDetails}>
-                            <Text style={styles.userName}>{item.users?.name || 'Unknown User'}</Text>
-                            <Text style={styles.userRating}>⭐ 5.0 (10 reviews)</Text>
-                        </View>
-                    </View>
-
-                    {billDocument && (
-                        <View style={styles.billSection}>
-                            <Text style={styles.billTitle}>Bill Document</Text>
-                            <View style={styles.billInfo}>
-                                <Ionicons name="document" size={20} color="#3B82F6" />
-                                <Text style={styles.billText}>Bill document available</Text>
-                                {user && user.id === item.user_id && (
-                                    <TouchableOpacity onPress={handleDeleteBill}>
-                                        <Ionicons name="trash" size={20} color="#EF4444" />
-                                    </TouchableOpacity>
-                                )}
-                            </View>
-                        </View>
-                    )}
-
-                    <ItemMatches itemId={id} onProposeTrade={handleProposeTrade} />
-
                     {/* Manual Barter Button */}
                     <TouchableOpacity
                         style={{ backgroundColor: '#2563EB', padding: 12, borderRadius: 8, marginBottom: 16, alignItems: 'center' }}
@@ -452,6 +405,53 @@ export default function ItemDetails() {
                             </View>
                         </View>
                     </Modal>
+
+                    <View style={styles.details}>
+                        <View style={styles.detailRow}>
+                            <Ionicons name="pricetag" size={16} color="#6B7280" />
+                            <Text style={styles.detailText}>Category: {item.category}</Text>
+                        </View>
+                        
+                        <View style={styles.detailRow}>
+                            <Ionicons name="checkmark-circle" size={16} color="#6B7280" />
+                            <Text style={styles.detailText}>Condition: {item.condition}</Text>
+                        </View>
+                        
+                        <View style={styles.detailRow}>
+                            <Ionicons name="swap-horizontal" size={16} color="#6B7280" />
+                            <Text style={styles.detailText}>Barter Type: {item.bartertype}</Text>
+                        </View>
+                    </View>
+
+                    <ItemLocation item={item} userLocation={userLocation} />
+                    
+                    <View style={styles.userInfo}>
+                        <Image 
+                            source={{ uri: item.users?.profile_image_url || require('../../assets/images/default-profile.png') }} 
+                            style={styles.userImage} 
+                        />
+                        <View style={styles.userDetails}>
+                            <Text style={styles.userName}>{item.users?.name || 'Unknown User'}</Text>
+                            <Text style={styles.userRating}>⭐ 5.0 (10 reviews)</Text>
+                        </View>
+                    </View>
+
+                    {billDocument && (
+                        <View style={styles.billSection}>
+                            <Text style={styles.billTitle}>Bill Document</Text>
+                            <View style={styles.billInfo}>
+                                <Ionicons name="document" size={20} color="#3B82F6" />
+                                <Text style={styles.billText}>Bill document available</Text>
+                                {user && user.id === item.user_id && (
+                                    <TouchableOpacity onPress={handleDeleteBill}>
+                                        <Ionicons name="trash" size={20} color="#EF4444" />
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+                        </View>
+                    )}
+
+                    <ItemMatches itemId={id} onProposeTrade={handleProposeTrade} />
                 </View>
             </View>
         </ScrollView>

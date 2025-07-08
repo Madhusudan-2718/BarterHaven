@@ -10,7 +10,6 @@ import { supabase } from '@/Config/supabaseConfig';
 import { useNotifications } from '@/context/NotificationContext';
 import NotificationCenter from '@/app/components/NotificationCenter';
 import NotificationPreferences from '@/app/components/NotificationPreferences';
-import Profile from './profile';
 
 export const SearchContext = createContext();
 

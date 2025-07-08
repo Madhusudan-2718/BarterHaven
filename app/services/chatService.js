@@ -87,24 +87,21 @@ class ChatService {
 
   // Enhanced: Send a message (optionally linked to a trade)
   async sendMessage({ senderId, receiverId, content, tradeId = null, type = 'text' }) {
-    try {
-      const { data, error } = await supabase
-        .from('messages')
-        .insert({
-          sender_id: senderId,
-          receiver_id: receiverId,
-          content,
-          type,
-          trade_id: tradeId || null,
-        })
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
-    } catch (error) {
-      console.error('Error sending message:', error);
-      throw error;
-    }
+    const { data, error } = await supabase
+      .from('messages')
+      .insert({
+        sender_id: senderId,
+        receiver_id: receiverId,
+        content,
+        trade_id: tradeId,
+        type,
+        status: 'sent',
+        created_at: new Date().toISOString(),
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
   }
 
   // Mark messages as read

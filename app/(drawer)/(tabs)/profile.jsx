@@ -18,7 +18,7 @@ const GRID_ITEM_SIZE = (width - (NUM_COLUMNS + 1) * GRID_SPACING) / NUM_COLUMNS;
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_IMAGE_TYPES = ['jpg', 'jpeg', 'png', 'gif'];
 
-export default function Profile({ onTradeChanged }) {
+export default function Profile() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
@@ -45,6 +45,7 @@ export default function Profile({ onTradeChanged }) {
   useEffect(() => {
     fetchUserProfile();
     fetchMyListings();
+    fetchTradesCount();
     fetchFavorites();
     fetchTradeProposals();
   }, []);
@@ -718,79 +719,9 @@ export default function Profile({ onTradeChanged }) {
         scrollEnabled={false}
       />
 
+      {/* Trade Proposals Section */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Trade Proposals</Text>
-        <Text style={styles.subSectionTitle}>Sent</Text>
-        <FlatList
-          data={tradeProposals.sent || []}
-          keyExtractor={item => item.id}
-          renderItem={({ item }) => {
-            const isAccepted = item.status === 'accepted';
-            const receiverId = item.items?.user_id;
-            return (
-              <TouchableOpacity
-                disabled={!isAccepted || !receiverId}
-                activeOpacity={isAccepted ? 0.7 : 1}
-                onPress={() => {
-                  if (isAccepted && receiverId) {
-                    router.push({ pathname: '/(drawer)/(tabs)/chat', params: { userId: receiverId } });
-                  }
-                }}
-                style={{ opacity: isAccepted ? 1 : 0.7 }}
-              >
-                <View style={styles.proposalCardAttractive}>
-                  <View style={styles.proposalHeaderRow}>
-                    {item.items?.image_url && (
-                      <Image source={{ uri: item.items.image_url }} style={styles.proposalItemImage} />
-                    )}
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.proposalTitleAttractive}>{item.items?.title || 'Unknown Item'}</Text>
-                      <Text style={styles.proposalDescAttractive}>{item.proposed_item_description}</Text>
-                    </View>
-                    <View style={[styles.statusBadge, styles[`status${item.status}`]]}>
-                      <Text style={styles.statusBadgeText}>{item.status.charAt(0).toUpperCase() + item.status.slice(1)}</Text>
-                    </View>
-                  </View>
-                </View>
-              </TouchableOpacity>
-            );
-          }}
-          ListEmptyComponent={<Text style={styles.emptyText}>No sent proposals.</Text>}
-          scrollEnabled={false}
-        />
-        <Text style={styles.subSectionTitle}>Received</Text>
-        <FlatList
-          data={tradeProposals.received || []}
-          keyExtractor={item => item.id}
-          renderItem={({ item }) => (
-            <View style={styles.proposalCardAttractive}>
-              <View style={styles.proposalHeaderRow}>
-                {item.items?.image_url && (
-                  <Image source={{ uri: item.items.image_url }} style={styles.proposalItemImage} />
-                )}
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.proposalTitleAttractive}>{item.items?.title || 'Unknown Item'}</Text>
-                  <Text style={styles.proposalDescAttractive}>{item.proposed_item_description}</Text>
-                </View>
-                <View style={[styles.statusBadge, styles[`status${item.status}`]]}>
-                  <Text style={styles.statusBadgeText}>{item.status.charAt(0).toUpperCase() + item.status.slice(1)}</Text>
-                </View>
-              </View>
-              {item.status === 'pending' && (
-                <View style={styles.actionsRowAttractive}>
-                  <TouchableOpacity style={[styles.actionButtonAttractive, styles.acceptButtonAttractive]} onPress={() => handleTradeProposal(item.id, 'accepted')}>
-                    <Text style={styles.actionButtonTextAttractive}>Accept</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={[styles.actionButtonAttractive, styles.rejectButtonAttractive]} onPress={() => handleTradeProposal(item.id, 'rejected')}>
-                    <Text style={styles.actionButtonTextAttractive}>Reject</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
-          )}
-          ListEmptyComponent={<Text style={styles.emptyText}>No received proposals.</Text>}
-          scrollEnabled={false}
-        />
+        <TradeProposals />
       </View>
 
       {/* Edit Profile Modal */}
@@ -1109,91 +1040,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 4,
     zIndex: 3,
-  },
-  proposalCardAttractive: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  proposalHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  proposalItemImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 8,
-    marginRight: 12,
-    backgroundColor: '#f0f0f0',
-  },
-  proposalTitleAttractive: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#2E3192',
-    marginBottom: 2,
-  },
-  proposalDescAttractive: {
-    fontSize: 14,
-    color: '#555',
-    marginBottom: 2,
-  },
-  statusBadge: {
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    alignSelf: 'flex-start',
-    marginLeft: 8,
-  },
-  statuspending: { backgroundColor: '#FFE066' },
-  statusaccepted: { backgroundColor: '#B6F09C' },
-  statusrejected: { backgroundColor: '#FFB4B4' },
-  statuscancelled: { backgroundColor: '#E0E0E0' },
-  statusBadgeText: {
-    fontWeight: 'bold',
-    color: '#333',
-    fontSize: 13,
-  },
-  actionsRowAttractive: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: 8,
-  },
-  actionButtonAttractive: {
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 20,
-    marginLeft: 8,
-    marginRight: 0,
-    elevation: 2,
-  },
-  acceptButtonAttractive: {
-    backgroundColor: '#10B981',
-  },
-  rejectButtonAttractive: {
-    backgroundColor: '#EF4444',
-  },
-  actionButtonTextAttractive: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 15,
-  },
-  subSectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1F2937',
-    marginBottom: 8,
-  },
-  emptyText: {
-    color: '#666',
-    fontSize: 16,
-    textAlign: 'center',
   },
 });
 
