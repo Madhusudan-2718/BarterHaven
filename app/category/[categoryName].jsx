@@ -49,6 +49,25 @@ export default function CategoryScreen() {
             activeOpacity={0.7}
         >
             <Image source={{ uri: item.image_url }} style={styles.itemImage} />
+            {/* Status Badge */}
+            <View style={{
+                position: 'absolute',
+                top: 12,
+                left: 12,
+                backgroundColor: item.status === 'available' ? '#10B981'
+                    : item.status === 'proposed' ? '#F59E0B'
+                    : item.status === 'bartered' ? '#3B82F6'
+                    : '#9CA3AF',
+                borderRadius: 12,
+                paddingHorizontal: 12,
+                paddingVertical: 4,
+                zIndex: 3,
+                alignSelf: 'flex-start',
+            }}>
+                <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 13 }}>
+                    {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+                </Text>
+            </View>
             <View style={styles.itemInfo}>
                 <Text style={styles.itemTitle} numberOfLines={2}>{item.title}</Text>
                 <Text style={styles.itemDescription} numberOfLines={2}>

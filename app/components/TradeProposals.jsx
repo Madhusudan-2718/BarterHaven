@@ -15,60 +15,60 @@ export default function TradeProposals() {
     const { refresh } = useContext(TradesRefreshContext);
 
     useEffect(() => {
-        if (user) {
-            fetchProposals();
-        } else {
-            setLoading(false);
-        }
-    }, [user]);
-
-    const fetchProposals = async () => {
-        if (!user) return;
-        try {
-            const { data: sentProposals, error: sentError } = await supabase
-                .from('trade_proposals')
-                .select('*, items:item_id(id, title, image_url, user_id)')
-                .eq('proposer_id', user.id)
-                .order('created_at', { ascending: false });
-            if (sentError) throw sentError;
-            const { data: receivedProposals, error: receivedError } = await supabase
-                .from('trade_proposals')
-                .select('*, items:item_id(id, title, image_url, user_id)')
-                .eq('items.user_id', user.id)
-                .order('created_at', { ascending: false });
-            if (receivedError) throw receivedError;
-            const uniqueProposals = new Map();
-            (sentProposals || []).forEach(proposal => {
-                uniqueProposals.set(proposal.id, { ...proposal, type: 'sent' });
-            });
-            (receivedProposals || []).forEach(proposal => {
-                uniqueProposals.set(proposal.id, { ...proposal, type: 'received' });
-            });
-            const allProposals = Array.from(uniqueProposals.values());
-            setProposals(allProposals);
-            // Fetch missing item titles and images
-            const missing = allProposals.filter(p => !p.items && p.item_id && !itemTitles[p.item_id]);
-            if (missing.length > 0) {
-                const ids = missing.map(p => p.item_id);
-                const { data: itemsData } = await supabase
-                    .from('items')
-                    .select('id, title, image_url, user_id')
-                    .in('id', ids);
-                if (itemsData) {
-                    const newTitles = { ...itemTitles };
-                    itemsData.forEach(item => {
-                        newTitles[item.id] = { title: item.title, image_url: item.image_url, user_id: item.user_id };
-                    });
-                    setItemTitles(newTitles);
-                }
+        const fetchProposals = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user || !user.id) {
+                setProposals({ incoming: [], outgoing: [] });
+                setLoading(false);
+                return;
             }
-        } catch (error) {
-            console.error('Error fetching proposals:', error);
-            Alert.alert('Error', 'Failed to load trade proposals');
-        } finally {
-            setLoading(false);
-        }
-    };
+            try {
+                const { data: sentProposals, error: sentError } = await supabase
+                    .from('trade_proposals')
+                    .select('*, items:item_id(id, title, image_url, user_id)')
+                    .eq('proposer_id', user.id)
+                    .order('created_at', { ascending: false });
+                if (sentError) throw sentError;
+                const { data: receivedProposals, error: receivedError } = await supabase
+                    .from('trade_proposals')
+                    .select('*, items:item_id(id, title, image_url, user_id)')
+                    .eq('items.user_id', user.id)
+                    .order('created_at', { ascending: false });
+                if (receivedError) throw receivedError;
+                const uniqueProposals = new Map();
+                (sentProposals || []).forEach(proposal => {
+                    uniqueProposals.set(proposal.id, { ...proposal, type: 'sent' });
+                });
+                (receivedProposals || []).forEach(proposal => {
+                    uniqueProposals.set(proposal.id, { ...proposal, type: 'received' });
+                });
+                const allProposals = Array.from(uniqueProposals.values());
+                setProposals(allProposals);
+                // Fetch missing item titles and images
+                const missing = allProposals.filter(p => !p.items && p.item_id && !itemTitles[p.item_id]);
+                if (missing.length > 0) {
+                    const ids = missing.map(p => p.item_id);
+                    const { data: itemsData } = await supabase
+                        .from('items')
+                        .select('id, title, image_url, user_id')
+                        .in('id', ids);
+                    if (itemsData) {
+                        const newTitles = { ...itemTitles };
+                        itemsData.forEach(item => {
+                            newTitles[item.id] = { title: item.title, image_url: item.image_url, user_id: item.user_id };
+                        });
+                        setItemTitles(newTitles);
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching proposals:', error);
+                Alert.alert('Error', 'Failed to load trade proposals');
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchProposals();
+    }, []);
 
     const handleProposalAction = async (proposalId, action) => {
         if (!user) return;

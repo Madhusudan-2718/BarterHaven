@@ -1,6 +1,6 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { View, Text, Image, StyleSheet, ActivityIndicator, ScrollView, Dimensions, TouchableOpacity, Modal, TextInput, Alert, Linking } from 'react-native';
+import { View, Text, Image, StyleSheet, ActivityIndicator, ScrollView, Dimensions, TouchableOpacity, Modal, TextInput, Alert, Linking, TouchableWithoutFeedback } from 'react-native';
 import { supabase } from '@/Config/supabaseConfig';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
@@ -26,6 +26,10 @@ export default function ItemDetails() {
     const [selectedUserItemId, setSelectedUserItemId] = useState(null);
     const [manualMessage, setManualMessage] = useState('');
     const [manualExchangeMode, setManualExchangeMode] = useState('online');
+    const [ratings, setRatings] = useState([]);
+    const [averageRating, setAverageRating] = useState(0);
+    const [userRating, setUserRating] = useState(null);
+    const [ratingSubmitting, setRatingSubmitting] = useState(false);
 
     useEffect(() => {
         const fetchItem = async () => {
@@ -54,6 +58,27 @@ export default function ItemDetails() {
             } catch (error) {
                 console.error('Error fetching item details:', error);
                 setLoading(false);
+            }
+        };
+
+        const fetchRatings = async () => {
+            if (!id) return;
+            const { data, error } = await supabase
+                .from('ratings')
+                .select('*')
+                .eq('product_id', id);
+            if (!error && data) {
+                setRatings(data);
+                if (data.length > 0) {
+                    const avg = data.reduce((sum, r) => sum + r.rating, 0) / data.length;
+                    setAverageRating(avg);
+                } else {
+                    setAverageRating(0);
+                }
+                if (user) {
+                    const userR = data.find(r => r.user_id === user.id);
+                    setUserRating(userR ? userR.rating : null);
+                }
             }
         };
 
@@ -99,7 +124,9 @@ export default function ItemDetails() {
         if (id) {
             fetchItem();
             fetchUserLocation();
+            fetchRatings();
         }
+        // Refetch ratings when user changes (login/logout)
     }, [id, user]);
 
     // Fetch user's own items for manual barter
@@ -278,6 +305,62 @@ export default function ItemDetails() {
         Alert.alert('Success', 'Trade proposal sent successfully');
     };
 
+    // Helper to render stars
+    const renderStars = (rating, size = 22, color = '#FBBF24') => {
+        const stars = [];
+        for (let i = 1; i <= 5; i++) {
+            stars.push(
+                <Ionicons
+                    key={i}
+                    name={i <= Math.round(rating) ? 'star' : 'star-outline'}
+                    size={size}
+                    color={color}
+                />
+            );
+        }
+        return stars;
+    };
+
+    // Handle user rating
+    const handleRate = async (ratingValue) => {
+        if (!user) {
+            Alert.alert('Sign In Required', 'Please sign in to rate this product.');
+            return;
+        }
+        setRatingSubmitting(true);
+        try {
+            // Upsert rating (insert or update)
+            const { error } = await supabase
+                .from('ratings')
+                .upsert({
+                    user_id: user.id,
+                    product_id: id,
+                    rating: ratingValue,
+                    updated_at: new Date().toISOString(),
+                }, { onConflict: ['user_id', 'product_id'] });
+            if (error) throw error;
+            setUserRating(ratingValue);
+            // Refetch ratings to update average
+            const { data, error: fetchError } = await supabase
+                .from('ratings')
+                .select('*')
+                .eq('product_id', id);
+            if (!fetchError && data) {
+                setRatings(data);
+                if (data.length > 0) {
+                    const avg = data.reduce((sum, r) => sum + r.rating, 0) / data.length;
+                    setAverageRating(avg);
+                } else {
+                    setAverageRating(0);
+                }
+            }
+        } catch (err) {
+            Alert.alert('Error', 'Failed to submit rating.');
+        } finally {
+            setRatingSubmitting(false);
+        }
+    };
+
     if (loading) {
         return (
             <View style={styles.centered}><ActivityIndicator size="large" color="#075eec" /></View>
@@ -296,6 +379,51 @@ export default function ItemDetails() {
                 <Image source={{ uri: item.image_url }} style={styles.image} />
                 
                 <View style={styles.content}>
+                    {/* Status Badge */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                        <View style={{
+                            backgroundColor: item.status === 'available' ? '#10B981'
+                                : item.status === 'proposed' ? '#F59E0B'
+                                : item.status === 'bartered' ? '#3B82F6'
+                                : '#9CA3AF',
+                            paddingHorizontal: 10,
+                            paddingVertical: 4,
+                            borderRadius: 8,
+                            marginRight: 8
+                        }}>
+                            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 13 }}>
+                                {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+                            </Text>
+                        </View>
+                    </View>
+                    {/* Product Rating Display */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                        {renderStars(averageRating, 22)}
+                        <Text style={{ marginLeft: 8, color: '#FBBF24', fontWeight: 'bold', fontSize: 16 }}>
+                            {averageRating > 0 ? averageRating.toFixed(1) : 'No ratings'}
+                        </Text>
+                        {ratings.length > 0 && (
+                            <Text style={{ marginLeft: 6, color: '#6B7280', fontSize: 14 }}>({ratings.length})</Text>
+                        )}
+                    </View>
+                    {/* User Rating Input */}
+                    {user && (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                            <Text style={{ marginRight: 8, color: '#374151', fontSize: 15 }}>Your Rating:</Text>
+                            {[1,2,3,4,5].map(i => (
+                                <TouchableWithoutFeedback key={i} onPress={() => handleRate(i)} disabled={ratingSubmitting}>
+                                    <View>
+                                        <Ionicons
+                                            name={i <= (userRating || 0) ? 'star' : 'star-outline'}
+                                            size={26}
+                                            color={i <= (userRating || 0) ? '#FBBF24' : '#D1D5DB'}
+                                        />
+                                    </View>
+                                </TouchableWithoutFeedback>
+                            ))}
+                            {ratingSubmitting && <ActivityIndicator size="small" color="#FBBF24" style={{ marginLeft: 8 }} />}
+                        </View>
+                    )}
                     <Text style={styles.title}>{item.title}</Text>
                     <Text style={styles.description}>{item.description}</Text>
                     
@@ -442,6 +570,19 @@ export default function ItemDetails() {
                             <View style={styles.billInfo}>
                                 <Ionicons name="document" size={20} color="#3B82F6" />
                                 <Text style={styles.billText}>Bill document available</Text>
+                                <TouchableOpacity
+                                    onPress={() => {
+                                        if (billDocument?.document_url) {
+                                            Linking.openURL(billDocument.document_url);
+                                        } else {
+                                            Alert.alert('Error', 'No bill document URL found.');
+                                        }
+                                    }}
+                                    style={{ marginLeft: 8, flexDirection: 'row', alignItems: 'center' }}
+                                >
+                                    <Ionicons name="eye" size={20} color="#2563EB" />
+                                    <Text style={{ color: '#2563EB', marginLeft: 4 }}>View Bill</Text>
+                                </TouchableOpacity>
                                 {user && user.id === item.user_id && (
                                     <TouchableOpacity onPress={handleDeleteBill}>
                                         <Ionicons name="trash" size={20} color="#EF4444" />

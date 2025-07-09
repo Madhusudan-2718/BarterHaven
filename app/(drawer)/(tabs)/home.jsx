@@ -178,14 +178,50 @@ export default function Home({ navigation }) {
             <Ionicons name={favorites.includes(item.id) ? "heart" : "heart-outline"} size={22} color={favorites.includes(item.id) ? "#e74c3c" : "#d1d5db"} />
           </TouchableOpacity>
         )}
-        <View style={styles.barterTypeTag}>
-          <Text style={styles.barterTypeText}>{item.bartertype || "Online Barter"}</Text>
+        {/* Status Badge */}
+        <View style={{
+          position: 'absolute',
+          top: 12,
+          left: 12,
+          backgroundColor: item.status === 'available' ? '#10B981'
+            : item.status === 'proposed' ? '#F59E0B'
+            : item.status === 'bartered' ? '#3B82F6'
+            : '#9CA3AF',
+          borderRadius: 12,
+          paddingHorizontal: 12,
+          paddingVertical: 4,
+          zIndex: 3,
+          alignSelf: 'flex-start',
+        }}>
+          <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 13 }}>
+            {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+          </Text>
         </View>
-        <View style={styles.categoryTag}>
-          <Text style={styles.categoryText}>{item.category}</Text>
+        {/* Barter Type Tag */}
+        <View style={{
+          position: 'absolute',
+          top: 12 + 28, // 12px top + 24px badge height + 6px margin
+          left: 12,
+          backgroundColor: 'rgba(255, 165, 0, 0.9)',
+          borderRadius: 12,
+          paddingHorizontal: 12,
+          paddingVertical: 6,
+          zIndex: 2,
+        }}>
+          <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>{item.bartertype || 'Online Barter'}</Text>
         </View>
-        <View style={[styles.statusTag, styles[`status${item.status}`]]}>
-          <Text style={styles.statusText}>{item.status.charAt(0).toUpperCase() + item.status.slice(1)}</Text>
+        {/* Category Tag */}
+        <View style={{
+          position: 'absolute',
+          top: 12 + 28 + 32, // 12px top + 24px badge + 6px margin + 26px barter tag + 6px margin
+          left: 12,
+          backgroundColor: 'rgba(108, 46, 183, 0.9)',
+          borderRadius: 12,
+          paddingHorizontal: 12,
+          paddingVertical: 6,
+          zIndex: 2,
+        }}>
+          <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>{item.category}</Text>
         </View>
       </View>
       <View style={styles.userInfoRow}>

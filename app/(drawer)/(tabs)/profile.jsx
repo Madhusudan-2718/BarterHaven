@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, Image, TouchableOpacity, StyleSheet, Alert, TextInput, FlatList, Modal, ScrollView, ActivityIndicator, Dimensions } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, Image, TouchableOpacity, StyleSheet, Alert, TextInput, FlatList, Modal, ScrollView, ActivityIndicator, Dimensions, Animated } from 'react-native';
 import { supabase } from '@/Config/supabaseConfig';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
@@ -10,13 +10,140 @@ import { LinearGradient } from 'expo-linear-gradient';
 import TradeProposals from '@/app/components/TradeProposals';
 import LocationPicker from '@/app/components/LocationPicker';
 import LocationService from '@/app/services/locationService';
+import { BlurView } from 'expo-blur';
 
 const { width } = Dimensions.get('window');
-const GRID_SPACING = 2;
-const NUM_COLUMNS = 3;
-const GRID_ITEM_SIZE = (width - (NUM_COLUMNS + 1) * GRID_SPACING) / NUM_COLUMNS;
+const GRID_SPACING = 8;
+const NUM_COLUMNS = 2;
+const GRID_ITEM_SIZE = (width - (NUM_COLUMNS + 1) * GRID_SPACING - 24) / NUM_COLUMNS;
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_IMAGE_TYPES = ['jpg', 'jpeg', 'png', 'gif'];
+
+// MyListingCard component for FlatList (must be at top level, outside Profile)
+function MyListingCard({ item, onPress, onRemove }) {
+  const scaleAnim = React.useRef(new Animated.Value(1)).current;
+  const handlePressIn = () => {
+    Animated.spring(scaleAnim, { toValue: 1.06, useNativeDriver: true }).start();
+  };
+  const handlePressOut = () => {
+    Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true }).start();
+  };
+  return (
+    <TouchableOpacity
+      activeOpacity={0.85}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      onPress={onPress}
+      style={{ margin: 4 }}
+    >
+      <Animated.View
+        style={[
+          styles.gridItem,
+          {
+            transform: [{ scale: scaleAnim }],
+            elevation: 8,
+            shadowColor: '#000',
+            shadowOpacity: 0.18,
+            shadowRadius: 16,
+            shadowOffset: { width: 0, height: 8 },
+            borderRadius: 18,
+            overflow: 'hidden',
+            borderWidth: 2,
+            borderColor: 'rgba(255,255,255,0.18)',
+            backgroundColor: 'rgba(255,255,255,0.18)',
+          },
+        ]}
+      >
+        {/* Glassmorphism Blur Card Background */}
+        <BlurView intensity={60} tint="light" style={{ ...StyleSheet.absoluteFillObject, borderRadius: 18 }} />
+        {/* Card Image with gradient overlay */}
+        <Image source={{ uri: item.image_url }} style={{ width: '100%', height: '100%', borderRadius: 18, position: 'absolute', top: 0, left: 0, opacity: 0.93 }} />
+        <View style={{ ...StyleSheet.absoluteFillObject, borderRadius: 18, backgroundColor: 'linear-gradient(135deg,rgba(255,255,255,0.05),rgba(108,46,183,0.08))' }} />
+        {/* Animated Gradient Border (simulated with shadow) */}
+        <View style={{
+          position: 'absolute',
+          top: 0, left: 0, right: 0, bottom: 0,
+          borderRadius: 18,
+          borderWidth: 2,
+          borderColor: 'rgba(108,46,183,0.18)',
+          zIndex: 1,
+        }} />
+        {/* Floating Status Badge (top-left) */}
+        <View style={{
+          position: 'absolute',
+          top: 12,
+          left: 12,
+          backgroundColor: item.status === 'available' ? '#10B981CC'
+            : item.status === 'proposed' ? '#F59E0BCC'
+            : item.status === 'bartered' ? '#3B82F6CC'
+            : '#9CA3AFCC',
+          borderRadius: 10,
+          paddingHorizontal: 10,
+          paddingVertical: 4,
+          zIndex: 3,
+          shadowColor: '#000',
+          shadowOpacity: 0.12,
+          shadowRadius: 4,
+          shadowOffset: { width: 0, height: 2 },
+        }}>
+          <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 12, letterSpacing: 0.2 }}>{item.status.charAt(0).toUpperCase() + item.status.slice(1)}</Text>
+        </View>
+        {/* Floating Glowing Remove Button (top-right) */}
+        <TouchableOpacity
+          style={{
+            position: 'absolute',
+            top: 10,
+            right: 10,
+            backgroundColor: '#fff',
+            borderRadius: 20,
+            padding: 5,
+            zIndex: 4,
+            elevation: 6,
+            shadowColor: '#FF3B30',
+            shadowOpacity: 0.5,
+            shadowRadius: 10,
+            shadowOffset: { width: 0, height: 2 },
+          }}
+          onPress={onRemove}
+        >
+          <MaterialCommunityIcons name="close" size={22} color="#FF3B30" />
+        </TouchableOpacity>
+        {/* Floating Category Chip (bottom-left) */}
+        <View style={{
+          position: 'absolute',
+          bottom: 60,
+          left: 12,
+          backgroundColor: 'rgba(108, 46, 183, 0.85)',
+          borderRadius: 8,
+          paddingHorizontal: 9,
+          paddingVertical: 3,
+          zIndex: 3,
+        }}>
+          <Text style={{ color: '#fff', fontSize: 11, fontWeight: '600' }}>{item.category}</Text>
+        </View>
+        {/* Frosted Glass Overlay for Title & Edit (bottom) */}
+        <BlurView intensity={70} tint="light" style={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: 54,
+          borderBottomLeftRadius: 18,
+          borderBottomRightRadius: 18,
+          overflow: 'hidden',
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingHorizontal: 12,
+        }}>
+          <Text style={{ color: '#222', fontWeight: 'bold', fontSize: 14, flex: 1 }} numberOfLines={1}>{item.title}</Text>
+          <View style={{ marginLeft: 8 }}>
+            <Feather name="edit-2" size={18} color="#7048E8" />
+          </View>
+        </BlurView>
+      </Animated.View>
+    </TouchableOpacity>
+  );
+}
 
 export default function Profile() {
   const [user, setUser] = useState(null);
@@ -39,6 +166,13 @@ export default function Profile() {
   const [favorites, setFavorites] = useState([]);
   const [favoriteItems, setFavoriteItems] = useState([]);
   const [tradeProposals, setTradeProposals] = useState([]);
+  const [transactions, setTransactions] = useState([]);
+  const [transactionsLoading, setTransactionsLoading] = useState(false);
+  const [disputes, setDisputes] = useState({});
+  const [showDisputeModal, setShowDisputeModal] = useState(false);
+  const [disputeReason, setDisputeReason] = useState('');
+  const [disputeSubmitting, setDisputeSubmitting] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState(null);
   const [userLocationData, setUserLocationData] = useState(null);
   const router = useRouter();
 
@@ -48,6 +182,8 @@ export default function Profile() {
     fetchTradesCount();
     fetchFavorites();
     fetchTradeProposals();
+    fetchTransactions();
+    fetchDisputes();
   }, []);
 
   const getCurrentUserId = async () => {
@@ -557,6 +693,97 @@ export default function Profile() {
     }
   };
 
+  const fetchTransactions = async () => {
+    try {
+      setTransactionsLoading(true);
+      const userId = await getCurrentUserId();
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('*, items(*)')
+        .or(`proposer_id.eq.${userId},receiver_id.eq.${userId}`)
+        .order('completed_at', { ascending: false });
+      if (error) throw error;
+      // Collect all unique user IDs (proposer and receiver)
+      const userIds = Array.from(new Set((data || []).flatMap(t => [t.proposer_id, t.receiver_id])));
+      // Fetch user info in batch
+      let userMap = {};
+      if (userIds.length > 0) {
+        const { data: usersData, error: usersError } = await supabase
+          .from('users')
+          .select('id, name, profile_image_url')
+          .in('id', userIds);
+        if (!usersError && usersData) {
+          usersData.forEach(u => { userMap[u.id] = u; });
+        }
+      }
+      // Attach user info to each transaction
+      const transactionsWithUsers = (data || []).map(t => ({
+        ...t,
+        proposer: userMap[t.proposer_id] || { id: t.proposer_id, name: 'User' },
+        receiver: userMap[t.receiver_id] || { id: t.receiver_id, name: 'User' },
+      }));
+      setTransactions(transactionsWithUsers);
+    } catch (error) {
+      console.error('Error fetching transactions:', error);
+    } finally {
+      setTransactionsLoading(false);
+    }
+  };
+
+  const fetchDisputes = async () => {
+    try {
+      const userId = await getCurrentUserId();
+      // Fetch all disputes for this user's transactions (as reporter or as transaction party)
+      const { data, error } = await supabase
+        .from('disputes')
+        .select('*')
+        .or(`user_id.eq.${userId},transaction_id.in.(${transactions.map(t => `'${t.id}'`).join(',')})`);
+      if (error) throw error;
+      // Map disputes by transaction_id
+      const disputeMap = {};
+      (data || []).forEach(d => { disputeMap[d.transaction_id] = d; });
+      setDisputes(disputeMap);
+    } catch (error) {
+      console.error('Error fetching disputes:', error);
+    }
+  };
+
+  const renderTransaction = ({ item }) => {
+    const isProposer = item.proposer_id === user.id;
+    const otherParty = isProposer ? item.receiver : item.proposer;
+    const dispute = disputes[item.id];
+    return (
+      <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderColor: '#eee' }}>
+        <Image source={{ uri: item.items?.image_url }} style={{ width: 48, height: 48, borderRadius: 8, marginRight: 12 }} />
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontWeight: 'bold', color: '#1F2937' }}>{item.items?.title || 'Item'}</Text>
+          <Text style={{ color: '#6B7280', fontSize: 13 }}>With: {otherParty?.name || 'User'}</Text>
+          <Text style={{ color: '#10B981', fontSize: 13 }}>{item.status.charAt(0).toUpperCase() + item.status.slice(1)}</Text>
+          {item.completed_at && <Text style={{ color: '#9CA3AF', fontSize: 12 }}>Completed: {new Date(item.completed_at).toLocaleDateString()}</Text>}
+          {/* Dispute UI */}
+          {dispute ? (
+            <View style={{ marginTop: 4 }}>
+              <Text style={{ color: dispute.status === 'resolved' ? '#10B981' : '#F59E0B', fontSize: 13 }}>
+                Dispute: {dispute.status.charAt(0).toUpperCase() + dispute.status.slice(1)}
+              </Text>
+              {dispute.resolution && <Text style={{ color: '#374151', fontSize: 12 }}>Resolution: {dispute.resolution}</Text>}
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={{ marginTop: 4, alignSelf: 'flex-start', backgroundColor: '#F59E0B', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 }}
+              onPress={() => {
+                setSelectedTransaction(item);
+                setShowDisputeModal(true);
+              }}
+            >
+              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 13 }}>Report Issue</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+    );
+  };
+
   if (loading) {
     return (
       <View style={styles.loading}>
@@ -651,35 +878,20 @@ export default function Profile() {
         data={myListings}
         keyExtractor={item => item.id}
         renderItem={({ item }) => (
-          <TouchableOpacity 
-            style={styles.gridItem}
+          <MyListingCard
+            item={item}
             onPress={() => router.push(`/item/${item.id}`)}
-          >
-            <Image source={{ uri: item.image_url }} style={styles.gridImage} />
-            <View style={styles.gridItemOverlay}>
-              <Text style={styles.gridTitle} numberOfLines={1}>{item.title}</Text>
-              <View style={[styles.statusBadge, styles[`status${item.status}`]]}>
-                <Text style={styles.statusText}>
-                  {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
-                </Text>
-              </View>
-            </View>
-            <TouchableOpacity 
-              style={styles.removeButton}
-              onPress={() => {
-                Alert.alert(
-                  'Remove Item',
-                  'Are you sure you want to remove this item?',
-                  [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Remove', style: 'destructive', onPress: () => handleRemoveItem(item.id) }
-                  ]
-                );
-              }}
-            >
-              <MaterialCommunityIcons name="close-circle" size={24} color="#FF3B30" />
-            </TouchableOpacity>
-          </TouchableOpacity>
+            onRemove={() => {
+              Alert.alert(
+                'Remove Item',
+                'Are you sure you want to remove this item?',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Remove', style: 'destructive', onPress: () => handleRemoveItem(item.id) }
+                ]
+              );
+            }}
+          />
         )}
         numColumns={NUM_COLUMNS}
         contentContainerStyle={styles.gridContainer}
@@ -723,6 +935,77 @@ export default function Profile() {
       <View style={styles.section}>
         <TradeProposals />
       </View>
+
+      {/* Barter History Section */}
+     <View style={{ backgroundColor: '#fff', borderRadius: 12, margin: 16, padding: 16, elevation: 2 }}>
+       <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 10, color: '#1F2937' }}>Barter History</Text>
+       {transactionsLoading ? (
+         <ActivityIndicator size="small" color="#075eec" />
+       ) : transactions.length === 0 ? (
+         <Text style={{ color: '#6B7280' }}>No completed barters yet.</Text>
+       ) : (
+         <FlatList
+           data={transactions}
+           renderItem={renderTransaction}
+           keyExtractor={item => item.id}
+           scrollEnabled={false}
+         />
+       )}
+       {/* Dispute Modal */}
+       <Modal visible={showDisputeModal} animationType="slide" transparent onRequestClose={() => setShowDisputeModal(false)}>
+         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', alignItems: 'center' }}>
+           <View style={{ backgroundColor: '#fff', borderRadius: 12, padding: 24, width: '85%' }}>
+             <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 12 }}>Report Issue</Text>
+             <Text style={{ marginBottom: 8, color: '#374151' }}>Describe the issue with this barter transaction.</Text>
+             <TextInput
+               value={disputeReason}
+               onChangeText={setDisputeReason}
+               placeholder="Reason for dispute"
+               multiline
+               style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 6, padding: 10, marginBottom: 12, minHeight: 60 }}
+             />
+             <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
+               <TouchableOpacity onPress={() => setShowDisputeModal(false)} style={{ marginRight: 16 }}>
+                 <Text style={{ color: '#EF4444', fontWeight: 'bold' }}>Cancel</Text>
+               </TouchableOpacity>
+               <TouchableOpacity
+                 onPress={async () => {
+                   if (!disputeReason.trim()) return;
+                   setDisputeSubmitting(true);
+                   try {
+                     const { data: { user } } = await supabase.auth.getUser();
+                     const { error } = await supabase
+                       .from('disputes')
+                       .insert({
+                         transaction_id: selectedTransaction.id,
+                         user_id: user.id,
+                         reason: disputeReason.trim(),
+                         status: 'open',
+                         created_at: new Date().toISOString(),
+                         updated_at: new Date().toISOString(),
+                       });
+                     if (error) throw error;
+                     setShowDisputeModal(false);
+                     setDisputeReason('');
+                     setSelectedTransaction(null);
+                     fetchDisputes();
+                     Alert.alert('Success', 'Dispute submitted. Our team will review it.');
+                   } catch (err) {
+                     Alert.alert('Error', 'Failed to submit dispute.');
+                   } finally {
+                     setDisputeSubmitting(false);
+                   }
+                 }}
+                 disabled={disputeSubmitting || !disputeReason.trim()}
+                 style={{ backgroundColor: '#F59E0B', paddingVertical: 10, paddingHorizontal: 18, borderRadius: 6 }}
+               >
+                 <Text style={{ color: '#fff', fontWeight: 'bold' }}>{disputeSubmitting ? 'Submitting...' : 'Submit'}</Text>
+               </TouchableOpacity>
+             </View>
+           </View>
+         </View>
+       </Modal>
+     </View>
 
       {/* Edit Profile Modal */}
       <Modal visible={showEditModal} transparent animationType="slide" onRequestClose={() => setShowEditModal(false)}>
@@ -874,18 +1157,20 @@ const styles = StyleSheet.create({
   },
   gridContainer: {
     padding: GRID_SPACING,
+    paddingHorizontal: 12,
   },
   gridItem: {
     width: GRID_ITEM_SIZE,
-    height: GRID_ITEM_SIZE,
-    margin: GRID_SPACING,
-    borderRadius: 8,
+    height: GRID_ITEM_SIZE * 1.18,
+    margin: GRID_SPACING / 2,
+    borderRadius: 18,
     overflow: 'hidden',
   },
   gridImage: {
     width: '100%',
     height: '100%',
     backgroundColor: '#eee',
+    borderRadius: 18,
   },
   gridItemOverlay: {
     position: 'absolute',

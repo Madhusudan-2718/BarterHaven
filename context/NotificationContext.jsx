@@ -90,9 +90,22 @@ export const NotificationProvider = ({ children }) => {
       await NotificationService.initialize(user.id);
       
       // Setup listener for badge updates
-      const unsubscribe = NotificationService.addListener((event, data) => {
+      const unsubscribe = NotificationService.addListener(async (event, data) => {
         if (event === 'badgeUpdate') {
-          setNotificationCount(data);
+          // Get the latest counts from backend and update state directly
+          if (user?.id) {
+            // Get notification count
+            const totalCount = NotificationService.getBadgeCount();
+            setNotificationCount(totalCount);
+            // Get chat-specific unread count
+            const { data: chatData, error } = await supabase
+              .from('messages')
+              .select('id')
+              .eq('receiver_id', user.id)
+              .is('read_at', null)
+              .is('deleted_at', null);
+            setChatBadgeCount(chatData?.length || 0);
+          }
         } else if (event === 'received') {
           // Refresh notifications when new one is received
           refreshNotifications();

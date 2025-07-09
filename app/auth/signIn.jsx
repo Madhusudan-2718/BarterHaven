@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Modal } from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/Config/supabaseConfig';
 import { useAuth } from '@/Config/AuthContext';
@@ -9,6 +9,10 @@ export default function SignIn() {
   const [password, setPassword] = useState('');
   const router = useRouter();
   const { signInWithGoogle } = useAuth();
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetMessage, setResetMessage] = useState('');
 
   const handleSignIn = async () => {
     if (!email || !password) {
@@ -46,9 +50,55 @@ export default function SignIn() {
       <TouchableOpacity style={styles.button} onPress={handleSignIn}>
         <Text style={styles.buttonText}>Sign In</Text>
       </TouchableOpacity>
+      <TouchableOpacity onPress={() => setShowResetModal(true)} style={{ alignSelf: 'center', marginTop: 8 }}>
+        <Text style={{ color: '#075eec', textDecorationLine: 'underline', fontSize: 15 }}>Forgot Password?</Text>
+      </TouchableOpacity>
       <TouchableOpacity onPress={() => router.push('/auth/signUp')}>
         <Text style={styles.linkText}>Don't have an account? Sign Up</Text>
       </TouchableOpacity>
+
+      {/* Password Reset Modal */}
+      <Modal visible={showResetModal} animationType="slide" transparent onRequestClose={() => setShowResetModal(false)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', alignItems: 'center' }}>
+          <View style={{ backgroundColor: '#fff', borderRadius: 12, padding: 24, width: '85%' }}>
+            <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 12 }}>Reset Password</Text>
+            <Text style={{ marginBottom: 8, color: '#374151' }}>Enter your email to receive a password reset link.</Text>
+            <TextInput
+              value={resetEmail}
+              onChangeText={setResetEmail}
+              placeholder="Email"
+              autoCapitalize="none"
+              keyboardType="email-address"
+              style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 6, padding: 10, marginBottom: 12 }}
+            />
+            {resetMessage ? <Text style={{ color: resetMessage.startsWith('Error') ? '#EF4444' : '#10B981', marginBottom: 8 }}>{resetMessage}</Text> : null}
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
+              <TouchableOpacity onPress={() => setShowResetModal(false)} style={{ marginRight: 16 }}>
+                <Text style={{ color: '#EF4444', fontWeight: 'bold' }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={async () => {
+                  setResetLoading(true);
+                  setResetMessage('');
+                  try {
+                    const { error } = await supabase.auth.resetPasswordForEmail(resetEmail);
+                    if (error) throw error;
+                    setResetMessage('Password reset email sent!');
+                  } catch (err) {
+                    setResetMessage('Error: ' + (err.message || 'Failed to send reset email.'));
+                  } finally {
+                    setResetLoading(false);
+                  }
+                }}
+                disabled={resetLoading || !resetEmail}
+                style={{ backgroundColor: '#075eec', paddingVertical: 10, paddingHorizontal: 18, borderRadius: 6 }}
+              >
+                <Text style={{ color: '#fff', fontWeight: 'bold' }}>{resetLoading ? 'Sending...' : 'Send Email'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

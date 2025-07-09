@@ -103,10 +103,10 @@ export default function SimpleMap({
             <Ionicons name="location" size={48} color="#3B82F6" />
           </View>
           <Text style={styles.mapPlaceholderText}>
-            Interactive Map
+            {String('Interactive Map')}
           </Text>
           <Text style={styles.coordinatesText}>
-            {latitude?.toFixed(6)}, {longitude?.toFixed(6)}
+            {`${latitude !== undefined && latitude !== null ? String(latitude.toFixed(6)) : ''}, ${longitude !== undefined && longitude !== null ? String(longitude.toFixed(6)) : ''}`}
           </Text>
           
           {__DEV__ && (
@@ -121,11 +121,11 @@ export default function SimpleMap({
         
         <View style={styles.mapFooter}>
           <Text style={styles.addressText}>
-            {address || 'Address not available'}
+            {address !== undefined && address !== null ? String(address) : 'Address not available'}
           </Text>
           {distance && (
             <Text style={styles.distanceText}>
-              Distance: {distance.toFixed(1)} km
+              {`Distance: ${typeof distance === 'number' ? distance.toFixed(1) : String(distance)} km`}
             </Text>
           )}
         </View>
@@ -153,12 +153,12 @@ export default function SimpleMap({
             {typeof address === 'string'
               ? address
               : address && address.fullAddress
-                ? address.fullAddress
-                : `${latitude?.toFixed(4)}, ${longitude?.toFixed(4)}`}
+                ? String(address.fullAddress)
+                : `${latitude !== undefined && latitude !== null ? String(latitude.toFixed(4)) : ''}, ${longitude !== undefined && longitude !== null ? String(longitude.toFixed(4)) : ''}`}
           </Text>
           {distance && (
             <Text style={styles.distanceText}>
-              {distance.toFixed(1)} km away
+              {`${typeof distance === 'number' ? distance.toFixed(1) : String(distance)} km away`}
             </Text>
           )}
         </View>

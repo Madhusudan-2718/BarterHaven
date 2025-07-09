@@ -3,6 +3,7 @@ import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, Activity
 import { useAuth } from '@/Config/AuthContext';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useNotifications } from '@/context/NotificationContext';
 import ChatService from '@/app/services/chatService';
 
 export default function ChatScreen() {
@@ -44,6 +45,7 @@ export default function ChatScreen() {
     };
   }, [selectedUser, user]);
 
+  const { updateBadgeCounts } = useNotifications();
   const fetchChatUsers = async () => {
     try {
       setLoading(true);
@@ -62,7 +64,12 @@ export default function ChatScreen() {
       setLoading(true);
       const messageData = await ChatService.getMessages(user.id, selectedUser.id);
       setMessages(messageData);
-      
+      // Immediately update badge counts after marking as read
+      if (typeof updateBadgeCounts === 'function') {
+        updateBadgeCounts();
+      }
+      // Refresh chat users to update unread counts in the chat list
+      fetchChatUsers();
       // Scroll to bottom
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
