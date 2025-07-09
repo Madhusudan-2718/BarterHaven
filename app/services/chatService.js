@@ -14,6 +14,7 @@ class ChatService {
 
   // Get all chat users with last message info
   async getChatUsers(userId) {
+    if (!userId || userId === "null") return [];
     try {
       // Get all users except current user
       const { data: allUsers, error: usersError } = await supabase
@@ -59,6 +60,7 @@ class ChatService {
 
   // Get messages between two users
   async getMessages(userId, otherUserId) {
+    if (!userId || userId === "null" || !otherUserId || otherUserId === "null") return [];
     try {
       const { data: messages, error } = await supabase
         .from('messages')
@@ -87,6 +89,7 @@ class ChatService {
 
   // Enhanced: Send a message (optionally linked to a trade)
   async sendMessage({ senderId, receiverId, content, tradeId = null, type = 'text' }) {
+    if (!senderId || senderId === "null" || !receiverId || receiverId === "null") return;
     const { data, error } = await supabase
       .from('messages')
       .insert({
@@ -202,6 +205,7 @@ class ChatService {
 
   // Get unread message count
   async getUnreadCount(userId) {
+    if (!userId || userId === "null") return 0;
     try {
       const { data, error } = await supabase
         .from('messages')

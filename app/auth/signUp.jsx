@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/Config/supabaseConfig';
+import { useAuth } from '@/Config/AuthContext';
 
 export default function SignUp() {
   const [name, setName] = useState('');
@@ -9,6 +10,13 @@ export default function SignUp() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const router = useRouter();
+  const { signInWithGoogle } = useAuth();
+
+  const validatePassword = (password) => {
+    // At least 8 chars, one uppercase, one lowercase, one special char
+    const regex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[!@#$%^&*])[A-Za-z\d!@#$%^&*]{8,}$/;
+    return regex.test(password);
+  };
 
   const handleSignUp = async () => {
     if (!name || !email || !password || !confirmPassword) {
@@ -17,6 +25,10 @@ export default function SignUp() {
     }
     if (password !== confirmPassword) {
       Alert.alert('Error', 'Passwords do not match');
+      return;
+    }
+    if (!validatePassword(password)) {
+      Alert.alert('Error', 'Password must be at least 8 characters long, contain at least one uppercase letter, one lowercase letter, and one special character (!@#$%^&*).');
       return;
     }
     const { error, data } = await supabase.auth.signUp({ email, password });

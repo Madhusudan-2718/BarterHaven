@@ -27,29 +27,13 @@ export default function TradeProposals() {
         try {
             const { data: sentProposals, error: sentError } = await supabase
                 .from('trade_proposals')
-                .select(`
-                    *,
-                    items!item_id (
-                        id,
-                        title,
-                        image_url,
-                        user_id
-                    )
-                `)
+                .select('*, items:item_id(id, title, image_url, user_id)')
                 .eq('proposer_id', user.id)
                 .order('created_at', { ascending: false });
             if (sentError) throw sentError;
             const { data: receivedProposals, error: receivedError } = await supabase
                 .from('trade_proposals')
-                .select(`
-                    *,
-                    items!item_id (
-                        id,
-                        title,
-                        image_url,
-                        user_id
-                    )
-                `)
+                .select('*, items:item_id(id, title, image_url, user_id)')
                 .eq('items.user_id', user.id)
                 .order('created_at', { ascending: false });
             if (receivedError) throw receivedError;
@@ -68,12 +52,12 @@ export default function TradeProposals() {
                 const ids = missing.map(p => p.item_id);
                 const { data: itemsData } = await supabase
                     .from('items')
-                    .select('id, title, image_url')
+                    .select('id, title, image_url, user_id')
                     .in('id', ids);
                 if (itemsData) {
                     const newTitles = { ...itemTitles };
                     itemsData.forEach(item => {
-                        newTitles[item.id] = { title: item.title, image_url: item.image_url };
+                        newTitles[item.id] = { title: item.title, image_url: item.image_url, user_id: item.user_id };
                     });
                     setItemTitles(newTitles);
                 }
@@ -207,9 +191,11 @@ export default function TradeProposals() {
                 proposals.map((proposal) => {
                     let itemTitle = proposal.items?.title;
                     let itemImage = proposal.items?.image_url;
+                    let itemOwnerId = proposal.items?.user_id;
                     if (proposal.item_id && itemTitles[proposal.item_id]) {
                         if (!itemTitle) itemTitle = itemTitles[proposal.item_id].title;
                         if (!itemImage) itemImage = itemTitles[proposal.item_id].image_url;
+                        if (!itemOwnerId) itemOwnerId = itemTitles[proposal.item_id].user_id;
                     }
                     // Optionally, you can add a placeholder image URL here
                     const placeholderImage = 'https://via.placeholder.com/60x60?text=No+Image';
@@ -246,7 +232,7 @@ export default function TradeProposals() {
                             )}
                             {proposal.status === 'pending' && (
                                 <View style={styles.actions}>
-                                    {user.id === proposal.items?.user_id ? (
+                                    {user.id === itemOwnerId ? (
                                         <>
                                             <TouchableOpacity
                                                 style={[styles.actionButton, styles.acceptButton]}
@@ -273,6 +259,29 @@ export default function TradeProposals() {
                                         </TouchableOpacity>
                                     )}
                                 </View>
+                            )}
+                            {proposal.status === 'accepted' && itemOwnerId && (
+                                <TouchableOpacity
+                                    style={[styles.actionButton, { backgroundColor: '#075eec', alignSelf: 'flex-end', marginTop: 8 }]}
+                                    onPress={() => {
+                                        router.push({
+                                            pathname: '/(drawer)/(tabs)/chat',
+                                            params: {
+                                                userId: user.id,
+                                                otherUserId: itemOwnerId,
+                                                tradeId: proposal.id // optional, if you want to pass trade/proposal id
+                                            }
+                                        });
+                                    }}
+                                >
+                                    <MaterialCommunityIcons name="chat" size={20} color="#fff" />
+                                    <Text style={styles.actionButtonText}>Go to Chat</Text>
+                                </TouchableOpacity>
+                            )}
+                            {proposal.status === 'accepted' && !itemOwnerId && (
+                                <Text style={{ color: 'red', marginTop: 8 }}>
+                                    Item or product owner not available for chat.
+                                </Text>
                             )}
                         </View>
                     );

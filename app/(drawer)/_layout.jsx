@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { createContext, useState } from 'react';
 import { Drawer } from 'expo-router/drawer';
 import { Ionicons } from '@expo/vector-icons';
 import { useColorScheme } from 'react-native';
@@ -6,6 +6,8 @@ import { DrawerContentScrollView, DrawerItemList, DrawerItem } from '@react-navi
 import { View, Text, StyleSheet, Image, Alert, Animated, Pressable } from 'react-native';
 import { useAuth } from '@/Config/AuthContext';
 import { supabase } from '@/Config/supabaseConfig';
+
+export const TradesRefreshContext = createContext({ refresh: () => {} });
 
 function CustomDrawerContent(props) {
     const { user } = useAuth();
@@ -184,65 +186,70 @@ function CustomDrawerContent(props) {
 }
 
 export default function DrawerLayout() {
+    const [refreshKey, setRefreshKey] = useState(0);
+    const refresh = () => setRefreshKey(k => k + 1);
     return (
-        <Drawer
-            drawerContent={(props) => <CustomDrawerContent {...props} />}
-            screenOptions={{
-                headerShown: false,
-                drawerStyle: {
-                    backgroundColor: '#fff',
-                    width: 280,
-                },
-                drawerActiveBackgroundColor: '#075eec',
-                drawerActiveTintColor: '#fff',
-                drawerInactiveTintColor: '#075eec',
-            }}
-        >
-            <Drawer.Screen
-                name="(tabs)"
-                options={{
+        <TradesRefreshContext.Provider value={{ refresh }}>
+            <Drawer
+                key={refreshKey}
+                drawerContent={(props) => <CustomDrawerContent {...props} />}
+                screenOptions={{
                     headerShown: false,
-                }}
-            />
-            <Drawer.Screen
-                name="browse"
-                options={{
-                    headerShown: false,
-                }}
-            />
-            <Drawer.Screen
-                name="trades"
-                options={{
-                    headerShown: true,
-                    title: 'My Trades',
-                    headerStyle: {
+                    drawerStyle: {
                         backgroundColor: '#fff',
+                        width: 280,
                     },
-                    headerTitleStyle: {
-                        color: '#075eec',
-                        fontFamily: 'outfit-bold',
-                        fontSize: 20,
-                    },
-                    headerTintColor: '#075eec',
+                    drawerActiveBackgroundColor: '#075eec',
+                    drawerActiveTintColor: '#fff',
+                    drawerInactiveTintColor: '#075eec',
                 }}
-            />
-            <Drawer.Screen
-                name="settings"
-                options={{
-                    headerShown: true,
-                    title: 'Settings',
-                    headerStyle: {
-                        backgroundColor: '#fff',
-                    },
-                    headerTitleStyle: {
-                        color: '#075eec',
-                        fontFamily: 'outfit-bold',
-                        fontSize: 20,
-                    },
-                    headerTintColor: '#075eec',
-                }}
-            />
-        </Drawer>
+            >
+                <Drawer.Screen
+                    name="(tabs)"
+                    options={{
+                        headerShown: false,
+                    }}
+                />
+                <Drawer.Screen
+                    name="browse"
+                    options={{
+                        headerShown: false,
+                    }}
+                />
+                <Drawer.Screen
+                    name="trades"
+                    options={{
+                        headerShown: true,
+                        title: 'My Trades',
+                        headerStyle: {
+                            backgroundColor: '#fff',
+                        },
+                        headerTitleStyle: {
+                            color: '#075eec',
+                            fontFamily: 'outfit-bold',
+                            fontSize: 20,
+                        },
+                        headerTintColor: '#075eec',
+                    }}
+                />
+                <Drawer.Screen
+                    name="settings"
+                    options={{
+                        headerShown: true,
+                        title: 'Settings',
+                        headerStyle: {
+                            backgroundColor: '#fff',
+                        },
+                        headerTitleStyle: {
+                            color: '#075eec',
+                            fontFamily: 'outfit-bold',
+                            fontSize: 20,
+                        },
+                        headerTintColor: '#075eec',
+                    }}
+                />
+            </Drawer>
+        </TradesRefreshContext.Provider>
     );
 }
 

@@ -2,11 +2,13 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/Config/supabaseConfig';
+import { useAuth } from '@/Config/AuthContext';
 
 export default function SignIn() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const router = useRouter();
+  const { signInWithGoogle } = useAuth();
 
   const handleSignIn = async () => {
     if (!email || !password) {

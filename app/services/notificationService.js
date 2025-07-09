@@ -13,6 +13,7 @@ class NotificationService {
   }
 
   async initialize(userId) {
+    if (!userId || userId === "null") return;
     if (this.isInitialized) return;
     
     this.userId = userId;
@@ -116,6 +117,7 @@ class NotificationService {
   }
 
   async storePushToken(token) {
+    if (!this.userId || this.userId === "null") return;
     try {
       // Check if user_push_tokens table exists, if not skip storage
       const { error } = await supabase
@@ -186,6 +188,7 @@ class NotificationService {
   }
 
   async setupDatabaseSubscriptions() {
+    if (!this.userId || this.userId === "null") return;
     try {
       // Clean up existing subscriptions first
       this.cleanup();

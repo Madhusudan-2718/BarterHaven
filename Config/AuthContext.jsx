@@ -55,7 +55,39 @@ export const AuthProvider = ({ children }) => {
             const { error } = await supabase.auth.signOut();
             if (error) throw error;
         },
+        signInWithGoogle: async () => {
+            const { error } = await supabase.auth.signInWithOAuth({ provider: 'google' });
+            if (error) throw error;
+            // The redirect will happen automatically. After redirect, session will be set.
+        },
     };
+
+    useEffect(() => {
+        const checkAndInsertUser = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            const user = session?.user;
+            if (user) {
+                // Check if user exists in users table
+                const { data: userProfile } = await supabase
+                    .from('users')
+                    .select('id')
+                    .eq('id', user.id)
+                    .maybeSingle();
+                if (!userProfile) {
+                    // Insert new user
+                    await supabase.from('users').insert([
+                        {
+                            id: user.id,
+                            email: user.email,
+                            name: user.user_metadata?.full_name || user.user_metadata?.name || '',
+                            created_at: new Date().toISOString(),
+                        },
+                    ]);
+                }
+            }
+        };
+        checkAndInsertUser();
+    }, [user]);
 
     return (
         <AuthContext.Provider value={value}>
