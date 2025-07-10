@@ -18,7 +18,29 @@ export default function TradeCompletion({ trade, isVisible, onClose, onComplete 
   const [proposerConfirmed, setProposerConfirmed] = useState(false);
   const [receiverConfirmed, setReceiverConfirmed] = useState(false);
   const [showNextStep, setShowNextStep] = useState(false);
-  const { data: { user } } = supabase.auth.getUser();
+  let user;
+  try {
+    const { data } = supabase.auth.getUser();
+    user = data?.user;
+  } catch (e) {
+    user = undefined;
+  }
+
+  if (!user) {
+    return (
+      <Modal visible={isVisible} animationType="slide" transparent={true} onRequestClose={onClose}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.2)' }}>
+          <View style={{ backgroundColor: '#fff', padding: 24, borderRadius: 12 }}>
+            <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 8 }}>Not Logged In</Text>
+            <Text style={{ fontSize: 16, color: '#666' }}>Please log in to complete this trade.</Text>
+            <TouchableOpacity onPress={onClose} style={{ marginTop: 16, alignSelf: 'flex-end' }}>
+              <Ionicons name="close" size={24} color="#666" />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    );
+  }
 
   const isProposer = user?.id === trade?.proposer_id;
   const otherParty = isProposer ? trade?.receiver : trade?.proposer;

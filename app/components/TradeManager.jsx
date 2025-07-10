@@ -15,8 +15,11 @@ import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/Config/supabaseConfig';
 import { useRouter } from 'expo-router';
 import TradeCompletion from './TradeCompletion';
+import DeliveryDetailsScreen from './DeliveryDetailsScreen';
+import TradeReviewModal from './TradeReviewModal';
+import ReportIssueButton from './ReportIssueButton';
 
-export default function TradeManager() {
+export default function TradeManager({ statusFilter = null }) {
   const [trades, setTrades] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedTrade, setSelectedTrade] = useState(null);
@@ -24,6 +27,9 @@ export default function TradeManager() {
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState([]);
   const [showCompletionModal, setShowCompletionModal] = useState(false);
+  const [showDeliveryModal, setShowDeliveryModal] = useState(false);
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [selectedTradeForReview, setSelectedTradeForReview] = useState(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -49,7 +55,7 @@ export default function TradeManager() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data, error } = await supabase
+      let query = supabase
         .from('trades')
         .select(`
           *,
@@ -74,10 +80,18 @@ export default function TradeManager() {
             id,
             name,
             profile_image_url
-          )
+          ),
+          trade_details(*),
+          trade_reviews(*)
         `)
-        .or(`proposer_id.eq.${user.id},receiver_id.eq.${user.id}`)
-        .order('created_at', { ascending: false });
+        .or(`proposer_id.eq.${user.id},receiver_id.eq.${user.id}`);
+
+      // Apply status filter if provided
+      if (statusFilter) {
+        query = query.eq('status', statusFilter);
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: false });
 
       if (error) throw error;
       setTrades(data || []);
@@ -202,16 +216,54 @@ export default function TradeManager() {
 
     if (item.status === 'accepted') {
       return (
-        <TouchableOpacity
-          style={[styles.actionButton, styles.completeButton]}
-          onPress={() => {
-            setSelectedTrade(item);
-            setShowCompletionModal(true);
-          }}
-        >
-          <MaterialCommunityIcons name="check-circle" size={20} color="#fff" />
-          <Text style={styles.actionButtonText}>Complete Trade</Text>
-        </TouchableOpacity>
+        <View style={styles.actionButtons}>
+          {!item.trade_details && (
+            <TouchableOpacity
+              style={[styles.actionButton, styles.deliveryButton]}
+              onPress={() => {
+                setSelectedTrade(item);
+                setShowDeliveryModal(true);
+              }}
+            >
+              <MaterialCommunityIcons name="truck-delivery" size={20} color="#fff" />
+              <Text style={styles.actionButtonText}>Setup Delivery</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity
+            style={[styles.actionButton, styles.completeButton]}
+            onPress={() => {
+              setSelectedTrade(item);
+              setShowCompletionModal(true);
+            }}
+          >
+            <MaterialCommunityIcons name="check-circle" size={20} color="#fff" />
+            <Text style={styles.actionButtonText}>Complete Trade</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    if (item.status === 'completed') {
+      const hasReviewed = item.trade_reviews?.some(review => review.reviewer_id === user?.id);
+      return (
+        <View style={styles.actionButtons}>
+          {!hasReviewed && (
+            <TouchableOpacity
+              style={[styles.actionButton, styles.reviewButton]}
+              onPress={() => {
+                setSelectedTradeForReview(item);
+                setShowReviewModal(true);
+              }}
+            >
+              <MaterialCommunityIcons name="star" size={20} color="#fff" />
+              <Text style={styles.actionButtonText}>Write Review</Text>
+            </TouchableOpacity>
+          )}
+          <ReportIssueButton 
+            trade={item} 
+            onReportSubmitted={() => fetchTrades()}
+          />
+        </View>
       );
     }
 
@@ -406,15 +458,42 @@ export default function TradeManager() {
         </View>
       </Modal>
 
-      <TradeCompletion
-        trade={selectedTrade}
-        isVisible={showCompletionModal}
-        onClose={() => setShowCompletionModal(false)}
-        onComplete={() => {
-          setShowCompletionModal(false);
-          fetchTrades();
-        }}
-      />
+      {/* Modals */}
+      {selectedTrade && (
+        <TradeCompletion
+          trade={selectedTrade}
+          isVisible={showCompletionModal}
+          onClose={() => setShowCompletionModal(false)}
+          onComplete={() => {
+            setShowCompletionModal(false);
+            fetchTrades();
+          }}
+        />
+      )}
+
+      {selectedTrade && (
+        <DeliveryDetailsScreen
+          trade={selectedTrade}
+          isVisible={showDeliveryModal}
+          onClose={() => setShowDeliveryModal(false)}
+          onComplete={() => {
+            setShowDeliveryModal(false);
+            fetchTrades();
+          }}
+        />
+      )}
+
+      {selectedTradeForReview && (
+        <TradeReviewModal
+          trade={selectedTradeForReview}
+          isVisible={showReviewModal}
+          onClose={() => setShowReviewModal(false)}
+          onComplete={() => {
+            setShowReviewModal(false);
+            fetchTrades();
+          }}
+        />
+      )}
     </View>
   );
 }
@@ -624,8 +703,11 @@ const styles = StyleSheet.create({
   },
   actionContainer: {
     marginTop: 12,
+  },
+  actionButtons: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
+    gap: 8,
   },
   actionButtons: {
     flexDirection: 'row',
@@ -655,5 +737,11 @@ const styles = StyleSheet.create({
   },
   completeButton: {
     backgroundColor: '#3B82F6',
+  },
+  deliveryButton: {
+    backgroundColor: '#3B82F6',
+  },
+  reviewButton: {
+    backgroundColor: '#F59E0B',
   },
 }); 

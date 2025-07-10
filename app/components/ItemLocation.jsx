@@ -8,68 +8,115 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import MapService from '@/app/services/mapService';
 import SimpleMap from './SimpleMap';
+import mapService from '@/app/services/mapService';
 
-export default function ItemLocation({
-  item,
-  userLocation = null,
+export default function ItemLocation({ 
+  latitude, 
+  longitude, 
+  address,
   style,
+  showDistance = false,
+  userLocation = null,
+  onLocationSelect = null,
+  interactive = false,
 }) {
   const [showMapModal, setShowMapModal] = useState(false);
   const [distance, setDistance] = useState(null);
 
   React.useEffect(() => {
-    if (item?.latitude && item?.longitude && userLocation?.latitude && userLocation?.longitude) {
+    if (showDistance && userLocation && latitude && longitude) {
       calculateDistance();
     }
-  }, [item, userLocation]);
+  }, [latitude, longitude, userLocation, showDistance]);
 
   const calculateDistance = async () => {
     try {
-      const calculatedDistance = MapService.calculateDistance(
+      const dist = mapService.calculateDistance(
         userLocation.latitude,
         userLocation.longitude,
-        item.latitude,
-        item.longitude
+        latitude,
+        longitude
       );
-      setDistance(calculatedDistance);
+      setDistance(dist);
     } catch (error) {
       console.error('Error calculating distance:', error);
     }
   };
 
-  const getLocationText = () => {
-    if (item?.address_city) {
-      return item.address_city;
-    }
-    if (item?.location) {
-      return item.location;
-    }
-    return 'Location not specified';
-  };
-
-  const getFullAddress = () => {
-    const parts = [
-      item?.address_street,
-      item?.address_city,
-      item?.address_region,
-      item?.address_postal_code,
-      item?.address_country,
-    ].filter(Boolean);
-
-    return parts.length > 0 ? parts.join(', ') : 'Address not available';
-  };
-
   const handleMapPress = () => {
-    if (!item?.latitude || !item?.longitude) {
+    if (!latitude || !longitude) {
       Alert.alert('No Location', 'This item does not have location information.');
       return;
     }
     setShowMapModal(true);
   };
 
-  if (!item?.latitude && !item?.longitude && !item?.location) {
+  const handleGetMyLocation = async () => {
+    try {
+      const location = await mapService.getLocationWithAddress();
+      
+      if (onLocationSelect) {
+        onLocationSelect(location);
+      }
+      
+      Alert.alert(
+        'Location Found',
+        `${location.address?.fullAddress || 'Location detected'}\n\nCoordinates: ${location.latitude.toFixed(4)}, ${location.longitude.toFixed(4)}`
+      );
+    } catch (error) {
+      console.error('Error getting location:', error);
+      Alert.alert(
+        'Location Error',
+        'Could not get your current location. Please check your location permissions.'
+      );
+    }
+  };
+
+  const renderMapModal = () => (
+    <Modal
+      visible={showMapModal}
+      animationType="slide"
+      presentationStyle="pageSheet"
+    >
+      <View style={styles.mapModalContainer}>
+        <View style={styles.mapHeader}>
+          <Text style={styles.mapTitle}>Item Location</Text>
+          <TouchableOpacity
+            onPress={() => setShowMapModal(false)}
+            style={styles.closeButton}
+          >
+            <Ionicons name="close" size={24} color="#333" />
+          </TouchableOpacity>
+        </View>
+        
+        <SimpleMap
+          latitude={latitude}
+          longitude={longitude}
+          title="Item Location"
+          description={address || 'Selected location'}
+          height={300}
+          style={styles.mapView}
+        />
+        
+        <View style={styles.mapFooter}>
+          <Text style={styles.addressText}>
+            {address || 'Address not available'}
+          </Text>
+          <Text style={styles.coordinatesText}>
+            {`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`}
+          </Text>
+          {distance && (
+            <Text style={styles.distanceText}>
+              {`Distance: ${distance.toFixed(1)} km`}
+            </Text>
+          )}
+        </View>
+      </View>
+    </Modal>
+  );
+
+  if (!latitude && !longitude && !interactive) {
     return (
       <View style={[styles.container, style]}>
         <View style={styles.locationInfo}>
@@ -81,30 +128,70 @@ export default function ItemLocation({
   }
 
   return (
-    <SimpleMap
-      latitude={item?.latitude}
-      longitude={item?.longitude}
-      address={getFullAddress()}
-      style={style}
-      showDistance={true}
-      userLocation={userLocation}
-    />
+    <View style={[styles.container, style]}>
+      <View style={styles.locationInfo}>
+        <Ionicons name="location" size={20} color="#3B82F6" />
+        <View style={styles.locationTextContainer}>
+          <Text style={styles.locationText}>
+            {typeof address === 'string'
+              ? address
+              : address && address.fullAddress
+                ? address.fullAddress
+                : `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`}
+          </Text>
+          {distance && (
+            <Text style={styles.distanceText}>
+              {`${distance.toFixed(1)} km away`}
+            </Text>
+          )}
+        </View>
+      </View>
+
+      <View style={styles.buttonContainer}>
+        {(latitude && longitude) && (
+          <TouchableOpacity
+            style={styles.mapButton}
+            onPress={handleMapPress}
+          >
+            <Ionicons name="map-outline" size={16} color="#3B82F6" />
+            <Text style={styles.mapButtonText}>View Map</Text>
+          </TouchableOpacity>
+        )}
+
+        {interactive && (
+          <TouchableOpacity
+            style={styles.locationButton}
+            onPress={handleGetMyLocation}
+          >
+            <Ionicons name="locate" size={16} color="#3B82F6" />
+            <Text style={styles.locationButtonText}>My Location</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {renderMapModal()}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     backgroundColor: '#fff',
-    borderRadius: 8,
-    padding: 12,
+    borderRadius: 12,
+    padding: 16,
     marginVertical: 8,
     borderWidth: 1,
     borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   locationInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   locationTextContainer: {
     marginLeft: 8,
@@ -114,26 +201,32 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     color: '#374151',
+    fontFamily: 'outfit',
   },
   noLocationText: {
     fontSize: 16,
     color: '#9CA3AF',
     marginLeft: 8,
+    fontFamily: 'outfit',
   },
   distanceText: {
     fontSize: 14,
     color: '#10B981',
     fontWeight: '500',
     marginTop: 2,
+    fontFamily: 'outfit',
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    gap: 8,
   },
   mapButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'flex-start',
-    paddingVertical: 6,
+    paddingVertical: 8,
     paddingHorizontal: 12,
     backgroundColor: '#EFF6FF',
-    borderRadius: 6,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: '#DBEAFE',
   },
@@ -142,6 +235,24 @@ const styles = StyleSheet.create({
     color: '#3B82F6',
     fontWeight: '500',
     marginLeft: 4,
+    fontFamily: 'outfit',
+  },
+  locationButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#F0FDF4',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+  },
+  locationButtonText: {
+    fontSize: 14,
+    color: '#059669',
+    fontWeight: '500',
+    marginLeft: 4,
+    fontFamily: 'outfit',
   },
   mapModalContainer: {
     flex: 1,
@@ -159,9 +270,13 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: '#374151',
+    fontFamily: 'outfit-bold',
   },
   closeButton: {
     padding: 4,
+  },
+  mapView: {
+    margin: 16,
   },
   mapFooter: {
     padding: 16,
@@ -170,7 +285,15 @@ const styles = StyleSheet.create({
   },
   addressText: {
     fontSize: 16,
+    fontWeight: '500',
     color: '#374151',
-    marginBottom: 4,
+    marginBottom: 8,
+    fontFamily: 'outfit',
+  },
+  coordinatesText: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontFamily: 'monospace',
+    marginBottom: 8,
   },
 }); 

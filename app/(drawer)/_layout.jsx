@@ -153,7 +153,12 @@ function CustomDrawerContent(props) {
                     label="Home"
                     iconName="home-outline"
                     routeName="(tabs)"
-                    onPress={() => props.navigation.navigate('(tabs)')}
+                    onPress={() => {
+                        props.navigation.navigate('(tabs)');
+                        setTimeout(() => {
+                            props.navigation.navigate('(tabs)/home');
+                        }, 0);
+                    }}
                 />
                 <CustomDrawerItem
                     label="Browse Items"

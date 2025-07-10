@@ -13,7 +13,7 @@ class MapService {
     try {
       // Check if native modules are available
       if (!__DEV__ && Platform.OS !== 'web') {
-        const Location = await import('expo-location');
+        // const Location = await import('expo-location'); // Disabled for Expo Go compatibility
         this.Location = Location;
         this.isNativeAvailable = true;
         console.log('Map service: Native modules available');

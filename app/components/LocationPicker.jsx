@@ -12,6 +12,15 @@ import { Ionicons } from '@expo/vector-icons';
 import MapService from '@/app/services/mapService';
 import SimpleMap from './SimpleMap';
 
+// Check if maps are available
+let isMapsAvailable = false;
+try {
+  require('react-native-maps');
+  isMapsAvailable = true;
+} catch (error) {
+  isMapsAvailable = false;
+}
+
 export default function LocationPicker({
   onLocationSelect,
   initialLocation = null,
@@ -183,13 +192,30 @@ export default function LocationPicker({
         </View>
       )}
 
-      <SimpleMap
-        latitude={location?.latitude}
-        longitude={location?.longitude}
-        address={address}
-        interactive={true}
-        onLocationSelect={handleLocationSelect}
-      />
+      {/* Only render SimpleMap if maps are available */}
+      {isMapsAvailable ? (
+        <SimpleMap
+          latitude={location?.latitude}
+          longitude={location?.longitude}
+          address={address}
+          interactive={true}
+          onLocationSelect={handleLocationSelect}
+        />
+      ) : (
+        <View style={styles.noMapsContainer}>
+          <Ionicons name="map-outline" size={40} color="#075eec" />
+          <Text style={styles.noMapsTitle}>Location Selected</Text>
+          <Text style={styles.noMapsText}>
+            {location?.latitude && location?.longitude 
+              ? `${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`
+              : 'No coordinates available'
+            }
+          </Text>
+          <Text style={styles.noMapsNote}>
+            Interactive maps available in custom builds
+          </Text>
+        </View>
+      )}
 
       {__DEV__ && (
         <View style={styles.locationWarning}>
@@ -209,6 +235,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     marginVertical: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -222,25 +250,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#075eec',
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 8,
-    gap: 8,
   },
   useLocationButtonText: {
     color: '#fff',
     fontWeight: '600',
+    marginLeft: 8,
     fontSize: 16,
+    fontFamily: 'outfit',
   },
   addressContainer: {
-    marginBottom: 12,
+    marginBottom: 16,
   },
   addressLabel: {
     fontSize: 16,
     fontWeight: '600',
     color: '#374151',
     marginBottom: 8,
+    fontFamily: 'outfit',
   },
   addressInput: {
     borderWidth: 1,
@@ -248,8 +278,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
-    backgroundColor: '#F9FAFB',
     minHeight: 80,
+    fontFamily: 'outfit',
   },
   manualEditActions: {
     marginTop: 8,
@@ -264,28 +294,32 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     borderWidth: 1,
     borderColor: '#DBEAFE',
-    marginBottom: 4,
   },
   geocodeButtonText: {
-    fontSize: 12,
     color: '#3B82F6',
+    fontSize: 14,
     fontWeight: '500',
     marginLeft: 4,
+    fontFamily: 'outfit',
   },
   manualEditNote: {
     fontSize: 12,
     color: '#6B7280',
-    fontStyle: 'italic',
+    marginTop: 4,
+    fontFamily: 'outfit',
   },
   coordinatesContainer: {
-    marginTop: 8,
-    marginBottom: 12,
+    marginBottom: 16,
+    padding: 12,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 8,
   },
   coordinatesLabel: {
     fontSize: 14,
     fontWeight: '600',
     color: '#374151',
     marginBottom: 4,
+    fontFamily: 'outfit',
   },
   coordinatesText: {
     fontSize: 14,
@@ -294,21 +328,54 @@ const styles = StyleSheet.create({
   },
   accuracyText: {
     fontSize: 12,
-    color: '#10B981',
-    marginTop: 2,
+    color: '#9CA3AF',
+    marginTop: 4,
+    fontFamily: 'outfit',
+  },
+  noMapsContainer: {
+    alignItems: 'center',
+    padding: 20,
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#e2e8f0',
+    borderStyle: 'dashed',
+    marginBottom: 16,
+  },
+  noMapsTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#075eec',
+    marginTop: 12,
+    fontFamily: 'outfit-bold',
+  },
+  noMapsText: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginTop: 4,
+    textAlign: 'center',
+    fontFamily: 'outfit',
+  },
+  noMapsNote: {
+    fontSize: 12,
+    color: '#f59e0b',
+    marginTop: 8,
+    fontFamily: 'outfit',
   },
   locationWarning: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 8,
     backgroundColor: '#EFF6FF',
-    borderRadius: 6,
-    marginTop: 8,
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
   },
   locationWarningText: {
     fontSize: 12,
-    color: '#1D4ED8',
-    marginLeft: 6,
+    color: '#3B82F6',
+    marginLeft: 8,
     flex: 1,
+    fontFamily: 'outfit',
   },
 }); 

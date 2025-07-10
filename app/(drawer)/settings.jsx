@@ -8,6 +8,7 @@ import {
     ScrollView,
     Alert,
     Animated,
+    Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -19,6 +20,8 @@ export default function SettingsScreen() {
     const [notificationsEnabled, setNotificationsEnabled] = useState(true);
     const [locationEnabled, setLocationEnabled] = useState(true);
     const [showNotificationPreferences, setShowNotificationPreferences] = useState(false);
+    const [showTerms, setShowTerms] = useState(false);
+    const [showPrivacy, setShowPrivacy] = useState(false);
 
     const handleLogout = () => {
         Alert.alert(
@@ -149,14 +152,14 @@ export default function SettingsScreen() {
                         title="Terms of Service"
                         description="Read our terms and conditions"
                         type="button"
-                        onValueChange={() => Alert.alert('Terms of Service', 'View our terms and conditions.')}
+                        onValueChange={() => setShowTerms(true)}
                     />
                     <SettingItem
                         icon="shield-outline"
                         title="Privacy Policy"
                         description="View our privacy policy"
                         type="button"
-                        onValueChange={() => Alert.alert('Privacy Policy', 'View our privacy policy.')}
+                        onValueChange={() => setShowPrivacy(true)}
                     />
                 </View>
 
@@ -174,6 +177,62 @@ export default function SettingsScreen() {
                 visible={showNotificationPreferences}
                 onClose={() => setShowNotificationPreferences(false)}
             />
+            {/* Terms of Service Modal */}
+            <Modal
+                visible={showTerms}
+                animationType="slide"
+                transparent={true}
+                onRequestClose={() => setShowTerms(false)}
+            >
+                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.2)', justifyContent: 'center', alignItems: 'center' }}>
+                    <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 24, width: '90%', maxHeight: '80%' }}>
+                        <Text style={{ fontSize: 20, fontWeight: 'bold', marginBottom: 12 }}>Terms of Service</Text>
+                        <ScrollView style={{ marginBottom: 16 }}>
+                            <Text style={{ fontSize: 16, color: '#333' }}>
+{`Welcome to BarterHaven! By using our app, you agree to the following:
+
+- You are responsible for the items you list and trade.
+- All trades are at your own risk; BarterHaven is not liable for losses or disputes.
+- You agree not to post illegal, prohibited, or offensive content.
+- You will treat other users respectfully and follow community guidelines.
+- BarterHaven may update these terms at any time. Continued use means acceptance of changes.
+
+For questions, contact support@barterhaven.com.`}
+                            </Text>
+                        </ScrollView>
+                        <TouchableOpacity onPress={() => setShowTerms(false)} style={{ alignSelf: 'flex-end' }}>
+                            <Ionicons name="close" size={28} color="#075eec" />
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
+            {/* Privacy Policy Modal */}
+            <Modal
+                visible={showPrivacy}
+                animationType="slide"
+                transparent={true}
+                onRequestClose={() => setShowPrivacy(false)}
+            >
+                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.2)', justifyContent: 'center', alignItems: 'center' }}>
+                    <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 24, width: '90%', maxHeight: '80%' }}>
+                        <Text style={{ fontSize: 20, fontWeight: 'bold', marginBottom: 12 }}>Privacy Policy</Text>
+                        <ScrollView style={{ marginBottom: 16 }}>
+                            <Text style={{ fontSize: 16, color: '#333' }}>
+{`We value your privacy. Here’s how we handle your data:
+
+- We collect only the information needed to provide our services (e.g., email, location, trade details).
+- Your data is never sold to third parties.
+- You can request deletion of your account and data at any time.
+- We use secure methods to store and transmit your information.
+- For more details or requests, contact privacy@barterhaven.com.`}
+                            </Text>
+                        </ScrollView>
+                        <TouchableOpacity onPress={() => setShowPrivacy(false)} style={{ alignSelf: 'flex-end' }}>
+                            <Ionicons name="close" size={28} color="#075eec" />
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 }

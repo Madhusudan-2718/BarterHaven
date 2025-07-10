@@ -59,15 +59,7 @@
           "photosPermission": "The app accesses your photos to let you share them with your friends."
         }
       ],
-      [
-        "expo-location",
-        {
-          "locationAlwaysAndWhenInUsePermission": "Allow BarterHaven to use your location to help you find nearby items and users.",
-          "locationAlwaysPermission": "Allow BarterHaven to use your location in the background to provide location-based features.",
-          "isIosBackgroundLocationEnabled": false,
-          "isAndroidBackgroundLocationEnabled": false
-        }
-      ],
+
       "expo-secure-store",
       "expo-font",
       [
