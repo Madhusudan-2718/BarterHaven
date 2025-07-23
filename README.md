@@ -1,52 +1,89 @@
 # BarterHaven
 
-# Welcome to your Expo app 👋
+**BarterHaven** is a modern cross-platform mobile application that enables real-time peer-to-peer bartering and trading. The app is built with a focus on intuitive user experience and functional capability, enabling users to exchange goods and services in a secure and efficient way.
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+## 📱 Features
 
-## Get started
+- 🔄 Real-time item listing and exchange
+- 📍 Location-based trading system
+- 💬 Chat and negotiation interface
+- 🔔 Push notifications for offers and messages
+- 🗺️ Google Maps integration for item location
+- 🔐 User authentication via Supabase
 
-1. Install dependencies
+## 🧰 Tech Stack
 
-   ```bash
-   npm install
-   ```
+Here’s a visual overview of the core technologies used:
 
-2. Start the app
+![Tech Stack](./assets/Screenshot%202025-07-23%20073228.png)
+ 
 
-   ```bash
-    npx expo start
-   ```
 
-In the output, you'll find options to open the app in a
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+## 🧪 Setup Instructions
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+### 1. Clone the Repository
 
-## Get a fresh project
+``bash
+git clone https://github.com/yourusername/BarterHaven.git
+cd BarterHaven
 
-When you're ready, run:
 
-```bash
-npm run reset-project
-```
+### 2. Install Dependencies
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+``bash
+npm install
 
-## Learn more
+###3. Environment Variables
 
-To learn more about developing your project with Expo, look at the following resources:
+Copy the example environment file and set your credentials:
+cp .env.example .env
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+Update values like Supabase URL and API key.
 
-## Join the community
+###4. Run the App
+npx expo start
 
-Join our community of developers creating universal apps.
+You can choose to open the app in:
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Expo Go
+
+Android Emulator
+
+iOS Simulator
+
+Custom Dev Build (recommended)
+
+
+📂 Project Structure
+BarterHaven/
+├── app/                  # Main application screens & navigation
+├── assets/               # Icons, images
+├── context/              # React Context for auth and user state
+├── supabase/             # Supabase configuration and queries
+├── Config/               # Custom constants and config files
+├── .vscode/              # Editor settings
+├── README.md             # Project overview
+└── ...
+
+🚀 Future Improvements
+In-app digital wallet system
+
+User ratings & reviews
+
+Multi-item negotiation system
+
+Admin dashboard (web-based)
+
+🤝 Contributing
+Feel free to fork the repository and submit pull requests. For major changes, please open an issue first.
+
+🙋‍♂️ Author
+Madhusudan V M
+📧 madhuachar2718@gmail.com
+🔗 LinkedIn | GitHub
+
+✨ “Build barter. Bridge needs.” ✨
+
+
+
